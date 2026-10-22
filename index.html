@@ -10,12 +10,21 @@
   #map { height: 100%; }
   .legenda { background: #fff; padding: 8px 10px; border-radius: 6px; font-size: 13px; line-height: 1.6; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
   .legenda i { display: inline-block; width: 22px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 6px; }
+  .legenda .sw { display: inline-block; width: 22px; height: 12px; vertical-align: middle; margin-right: 6px; border: 1px solid #888; }
   .legenda small { color: #666; }
+  .pop { max-width: 340px; font-size: 13px; line-height: 1.4; }
+  .pop h3 { margin: 0 0 4px; font-size: 15px; }
+  .pop .kpi { margin: 6px 0; }
+  .pop .kpi b { font-size: 16px; }
+  .pop ul { margin: 2px 0 6px; padding-left: 18px; }
+  .pop .pro { color: #1a7f37; } .pop .contro { color: #b3261e; }
+  .pop .fonte { color: #666; font-size: 11px; margin-top: 6px; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 <script src="data/base.js"></script>
 <script>
 const map = L.map('map').setView([45.314, 9.503], 14);
@@ -24,29 +33,88 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 
-const confine = L.polyline(BASE.confine, { color: '#c0392b', weight: 3, dashArray: '8 5' }).addTo(map).bindTooltip('Confine comunale di Lodi');
-const adda = L.polyline(BASE.adda, { color: '#1f6fd1', weight: 5, opacity: .8 }).addTo(map).bindTooltip('Fiume Adda');
-const ferrovia = L.polyline(BASE.ferrovia, { color: '#333', weight: 3, dashArray: '2 6' }).addTo(map).bindTooltip('Ferrovia Milano–Bologna');
+// --- Confine comunale: i way OSM vengono uniti in anelli chiusi ---
+function anelli(ways) {
+  const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+  const rest = ways.map(w => w.slice()), out = [];
+  while (rest.length) {
+    let r = rest.shift(), found = true;
+    while (found && !same(r[0], r[r.length - 1])) {
+      found = false;
+      for (let i = 0; i < rest.length; i++) {
+        const w = rest[i], last = r[r.length - 1];
+        if (same(last, w[0])) r = r.concat(w.slice(1));
+        else if (same(last, w[w.length - 1])) r = r.concat(w.slice().reverse().slice(1));
+        else if (same(r[0], w[w.length - 1])) r = w.slice(0, -1).concat(r);
+        else if (same(r[0], w[0])) r = w.slice().reverse().slice(0, -1).concat(r);
+        else continue;
+        rest.splice(i, 1); found = true; break;
+      }
+    }
+    if (!same(r[0], r[r.length - 1])) r.push(r[0]);
+    out.push(r);
+  }
+  return out;
+}
+const comune = turf.multiPolygon(anelli(BASE.confine).map(r => [r.map(([la, lo]) => [lo, la])]));
 
+// --- Macrozone: colore per €/mq richiesto ---
+const STOPS = ['#ffffb2', '#fecc5c', '#fd8d3c', '#f03b20', '#bd0026'];
+function colore(v, min, max) {
+  const x = (v - min) / (max - min) * (STOPS.length - 1), i = Math.min(Math.floor(x), STOPS.length - 2);
+  const a = STOPS[i], b = STOPS[i + 1], f = x - i;
+  const h = s => [1, 3, 5].map(k => parseInt(s.substr(k, 2), 16));
+  return '#' + h(a).map((c, k) => Math.round(c + (h(b)[k] - c) * f).toString(16).padStart(2, '0')).join('');
+}
+const eur = n => n.toLocaleString('it-IT');
+const lista = a => '<ul>' + a.map(x => `<li>${x}</li>`).join('') + '</ul>';
+
+fetch('data/zone.json').then(r => r.json()).then(zone => {
+  const prezzi = zone.map(z => z.ask), min = Math.min(...prezzi), max = Math.max(...prezzi);
+  const gruppo = L.layerGroup().addTo(map);
+  zone.forEach(z => {
+    const pezzi = z.poly.map(r => turf.intersect(turf.polygon([r.map(([la, lo]) => [lo, la]).concat([[r[0][1], r[0][0]]])]), comune)).filter(Boolean);
+    if (!pezzi.length) return;
+    const col = colore(z.ask, min, max);
+    L.geoJSON({ type: 'FeatureCollection', features: pezzi }, { style: { color: '#555', weight: 1.5, fillColor: col, fillOpacity: .6 } })
+      .addTo(gruppo)
+      .bindTooltip(`${z.k}: ${eur(z.ask)} €/mq`, { sticky: true })
+      .bindPopup(`<div class="pop"><h3>${z.k}</h3>
+        <div>${z.pos}</div>
+        <div class="kpi"><b>${eur(z.ask)} €/mq</b> richiesto · trend 12 mesi <b>${z.yoy > 0 ? '+' : ''}${String(z.yoy).replace('.', ',')}%</b><br>
+        ${z.n} annunci · affitto ${String(z.rent).replace('.', ',')} €/mq/mese</div>
+        <b class="pro">Pro</b>${lista(z.pro)}<b class="contro">Contro</b>${lista(z.contro)}
+        <div><b>Giudizio flipping: ${z.score}.</b> ${z.flip}</div>
+        <div style="margin-top:4px"><b>Microzone:</b> ${z.micro}</div>
+        <div class="fonte">Fonte: Immobiliare.it, mercato immobiliare Lodi, settembre 2026 (prezzi richiesti, non compravendite). Confini zona provvisori, da validare.</div></div>`, { maxWidth: 360 });
+  });
+
+  const leg = L.control({ position: 'bottomleft' });
+  leg.onAdd = () => {
+    const d = L.DomUtil.create('div', 'legenda');
+    const sw = [0, .25, .5, .75, 1].map(f => `<span class="sw" style="background:${colore(min + (max - min) * f, min, max)}"></span>${eur(Math.round(min + (max - min) * f))}`).join('<br>');
+    d.innerHTML = '<b>Mappa valori Lodi</b><br><b>€/mq richiesto per zona</b><br>' + sw + '<br>' +
+      '<i style="border-color:#c0392b;border-top-style:dashed"></i>Confine comunale<br>' +
+      '<i style="border-color:#1f6fd1"></i>Adda<br>' +
+      '<i style="border-color:#333;border-top-style:dotted"></i>Ferrovia<br>' +
+      '<span style="color:#e67e22">&#9679;</span> Punti di riferimento<br>' +
+      `<small>Confini zona provvisori. Geometrie: OpenStreetMap, ${BASE.data}</small>`;
+    return d;
+  };
+  leg.addTo(map);
+});
+
+// --- Base cartografica (sopra le zone) ---
+const confine = L.polyline(BASE.confine, { color: '#c0392b', weight: 3, dashArray: '8 5', interactive: false }).addTo(map);
+L.polyline(BASE.adda, { color: '#1f6fd1', weight: 5, opacity: .8, interactive: false }).addTo(map);
+L.polyline(BASE.ferrovia, { color: '#333', weight: 3, dashArray: '2 6', interactive: false }).addTo(map);
 BASE.punti.forEach(p =>
   L.circleMarker(p.c, { radius: 8, color: '#fff', weight: 2, fillColor: '#e67e22', fillOpacity: 1 })
     .addTo(map).bindPopup(`<b>${p.n}</b><br><small>Fonte: OpenStreetMap (${p.osm})</small>`)
 );
-
-map.fitBounds(confine.getBounds());
-
-const leg = L.control({ position: 'bottomleft' });
-leg.onAdd = () => {
-  const d = L.DomUtil.create('div', 'legenda');
-  d.innerHTML = '<b>Mappa valori Lodi</b><br>' +
-    '<i style="border-color:#c0392b;border-top-style:dashed"></i>Confine comunale<br>' +
-    '<i style="border-color:#1f6fd1"></i>Adda<br>' +
-    '<i style="border-color:#333;border-top-style:dotted"></i>Ferrovia<br>' +
-    '<span style="color:#e67e22">&#9679;</span> Punti di riferimento<br>' +
-    `<small>Dati geometrici: OpenStreetMap, Overpass API, ${BASE.data}</small>`;
-  return d;
-};
-leg.addTo(map);
+const adatta = () => { map.invalidateSize(); map.fitBounds(confine.getBounds()); };
+adatta();
+window.addEventListener('load', adatta);
 </script>
 </body>
 </html>
