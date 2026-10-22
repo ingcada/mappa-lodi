@@ -1,183 +1,175 @@
 [
-{
-    "k":  "Centro Storico",
-    "ask":  2727,
-    "yoy":  20.6,
-    "n":  109,
-    "rent":  11.23,
-    "pos":  "Dentro i viali, da Piazza della Vittoria all\u0027Adda",
-    "score":  "alto",
-    "pro":  [
-                "Duomo, Piazza della Vittoria, negozi e scuole a piedi",
-                "Stazione a circa 600 m da Piazza della Vittoria",
-                "Prezzi in crescita più che altrove: +20,6% in un anno",
-                "Il ristrutturato si rivende al prezzo più alto della città e in fretta"
-            ],
-    "contro":  [
-                   "Il vecchio costa già caro: il 50% della rivendita è difficile da ottenere",
-                   "ZTL e parcheggio: cantiere più costoso (suolo pubblico, montascale, permessi)",
-                   "Palazzi storici spesso senza ascensore e con negozi o locali al piano terra",
-                   "Metri spesso gonfiati negli annunci (Via Strepponi: 119 dichiarati, 104 reali)"
-               ],
-    "flip":  "Margine più alto in euro e rivendita veloce. Le occasioni sono poche: quando c\u0027è il prezzo giusto va presa subito.",
-    "micro":  "Il lato verso l\u0027Adda (Via San Francesco d\u0027Assisi, Piazza Ospitale, Piazzale Barzaghi) e l\u0027asse di Corso Umberto valgono di più. Verso la stazione (Piazza Zaninelli) si scende di 400-450 €/mq.",
-  "poly": [[[45.3095,9.4995],[45.3172,9.4995],[45.3172,9.5079],[45.3095,9.5079]]]
-},
-{
-    "k":  "Città Bassa, Laghi",
-    "ask":  2306,
-    "yoy":  19.4,
-    "n":  86,
-    "rent":  11.43,
-    "pos":  "Bordo nord del centro (Via Defendente, Via Dieci Maggio) e sponda est oltre il ponte: Borgo Adda, Laghi, Ospedale Maggiore",
-    "score":  "alto",
-    "pro":  [
-                "A un ponte dal centro: si vende come \u0027vicino al centro\u0027 a prezzi più bassi",
-                "Ospedale Maggiore: domanda di medici, infermieri e personale, anche in affitto",
-                "Lungo Adda e verde fluviale",
-                "Seconda zona per crescita: +19,4% in un anno, affitti più alti della città"
-            ],
-    "contro":  [
-                   "Vicino al fiume: verificare sempre il rischio idraulico (mappe di pericolosità PGRA) per piani bassi e cantine",
-                   "Traffico sul ponte e sull\u0027asse dell\u0027ospedale",
-                   "Valori molto diversi da via a via: da 1.782 a 2.846 €/mq"
-               ],
-    "flip":  "Zona in ascesa, ma la via decide tutto. Laghi e Dieci Maggio tirano, Vistarini e Massena restano indietro.",
-    "micro":  "Forti: Via Dieci Maggio (2.846), Via Francesco Cagnola (2.616), Via Lago di Costanza (2.416). Deboli: Via Vistarini (1.782), Largo Donatori del Sangue (1.903).",
-  "poly": [[[45.3172,9.4995],[45.3195,9.4995],[45.3195,9.5079],[45.3172,9.5079]],[[45.305,9.5079],[45.3205,9.5079],[45.3205,9.6],[45.305,9.6]]]
-},
-{
-    "k":  "Braila, Stazione",
-    "ask":  2158,
-    "yoy":  3.3,
-    "n":  40,
-    "rent":  10.19,
-    "pos":  "Tra il centro e la ferrovia: Corso Mazzini, Viale Agnelli, Viale Vignati, Viale Rimembranze",
-    "score":  "medio",
-    "pro":  [
-                "Stazione: treni per Milano a pochi passi",
-                "Il centro si raggiunge a piedi",
-                "Molto stock anni \u002760-\u002770 da ristrutturare a prezzi sotto il centro"
-            ],
-    "contro":  [
-                   "Crescita lenta: +3,3% in un anno",
-                   "Rumore della ferrovia nelle vie a ridosso dei binari",
-                   "Condomini con riscaldamento centralizzato e spese alte (233 €/mese in Viale Rimembranze 38)"
-               ],
-    "flip":  "Buona per un acquirente pendolare. Puntare sulle vie verso il centro, evitare il fronte binari.",
-    "micro":  "Forti: Viale Sant\u0027Angelo (2.462), Viale Trento e Trieste (2.332), Viale Vignati (2.287). Debole: Viale Milite Ignoto (1.922).",
-  "poly": [[[45.3053,9.4995],[45.3095,9.4995],[45.3095,9.5079],[45.3053,9.5079]],[[45.305,9.4995],[45.3053,9.4995],[45.3053,9.5],[45.305,9.5]]]
-},
-{
-    "k":  "Fanfani",
-    "ask":  2077,
-    "yoy":  6.2,
-    "n":  45,
-    "rent":  10.11,
-    "pos":  "Ovest del centro, quartiere INA-Casa nato dal 1955; il bordo est tocca il centro",
-    "score":  "medio-alto",
-    "pro":  [
-                "Tra le zone più richieste dalle famiglie insieme a San Fereolo",
-                "Il bordo verso il centro ha prezzi da centro: Via Foscolo, Via D\u0027Azeglio, Viale Montessori",
-                "Quartiere residenziale con servizi e scuole",
-                "Vecchio anni \u002750-\u002760 a prezzi bassi: forbice ampia con il ristrutturato"
-            ],
-    "contro":  [
-                   "Case INA-Casa: tagli piccoli, spesso senza ascensore, impianti da rifare",
-                   "Nel cuore del quartiere il ristrutturato vale 1.900-2.100 €/mq",
-                   "Acquirenti con budget più contenuto"
-               ],
-    "flip":  "Zona da volumi: comprare bene il vecchio fino al 2° piano senza ascensore. La microzona premium è il bordo verso il centro.",
-    "micro":  "Forti: Via Ugo Foscolo (3.316, spinta dal nuovo), Via D\u0027Azeglio (2.673), Via Ungaretti (2.640), Viale Montessori (2.625). Deboli: Via Cadamosto (1.841), Via Sant\u0027Alberto (1.905).",
-  "poly": [[[45.3095,9.4],[45.3195,9.4],[45.3195,9.4995],[45.3095,9.4995]]]
-},
-{
-    "k":  "San Fereolo, Albarola, Faustina",
-    "ask":  1976,
-    "yoy":  12.3,
-    "n":  116,
-    "rent":  11.22,
-    "pos":  "Sud-ovest oltre la ferrovia: Viale Pavia, Via Spelta, Viale Papa Giovanni XXIII, area ex ABB",
-    "score":  "medio",
-    "pro":  [
-                "Tra le zone più richieste dalle famiglie",
-                "Crescita solida: +12,3% in un anno",
-                "Nuove costruzioni (area ex ABB \u0027Isole Verdi\u0027) che migliorano l\u0027immagine della zona",
-                "Tanta offerta (116 annunci): più scelta e più margine di trattativa"
-            ],
-    "contro":  [
-                   "La ferrovia la separa dal centro",
-                   "In rivendita si compete con il nuovo",
-                   "Molti condomini anni \u002770-\u002780 con piani alti senza ascensore"
-               ],
-    "flip":  "Buona sulle vie forti, dove il ristrutturato supera i 2.400 €/mq.",
-    "micro":  "Forti: Via Maestri del Lavoro (2.454), Via Dunieri (2.417), Via Todisco (2.416). Debole: Via Luigi Bay (1.480).",
-  "poly": [[[45.25,9.4],[45.3095,9.4],[45.3095,9.4995],[45.25,9.4995]],[[45.25,9.4995],[45.305,9.4995],[45.305,9.5],[45.25,9.5]]]
-},
-{
-    "k":  "Revellino, Campo Marte",
-    "ask":  1987,
-    "yoy":  10.1,
-    "n":  52,
-    "rent":  8.18,
-    "pos":  "Sponda est a nord dell\u0027ospedale (Via Cavallotti, Via Borsellino) fino alle frazioni Riolo e Fontana",
-    "score":  "selettivo",
-    "pro":  [
-                "Vie nuove ad alto valore vicino all\u0027ospedale: Via Hayez, Via Scuri",
-                "Crescita del 10% in un anno",
-                "Più spazio e verde, molte villette"
-            ],
-    "contro":  [
-                   "Frazioni quasi rurali (Riolo, Fontana) con rivendita lenta",
-                   "Per il centro si passa dal ponte sull\u0027Adda",
-                   "Affitti tra i più bassi",
-                   "I valori alti sono del nuovo: l\u0027usato ristrutturato non ci arriva"
-               ],
-    "flip":  "Solo nelle vie vicine a ospedale e Laghi. Evitare le frazioni.",
-    "micro":  "Forti: Via Hayez (2.807), Via Scuri (2.722), Via Arisi (2.525). Deboli: Via Caponnetto (1.659), Viale Piave (1.698).",
-  "poly": [[[45.3205,9.5079],[45.37,9.5079],[45.37,9.6],[45.3205,9.6]]]
-},
-{
-    "k":  "San Bernardo, Olmo",
-    "ask":  1927,
-    "yoy":  8.3,
-    "n":  54,
-    "rent":  9.51,
-    "pos":  "Sud e sud-est: Viale Italia, Viale Calabria, Viale Lombardia, Viale Piacenza, centro sportivo Faustina",
-    "score":  "basso",
-    "pro":  [
-                "Prezzi d\u0027ingresso tra i più bassi",
-                "Condomini anni \u002760-\u002770 spesso con ascensore e box",
-                "Centro sportivo Faustina e servizi di quartiere"
-            ],
-    "contro":  [
-                   "Rivendita bassa: mediana delle vie intorno a 1.850 €/mq, margine stretto in euro",
-                   "Viale Piacenza trafficato, aree produttive verso sud-est",
-                   "Domanda di affitto debole"
-               ],
-    "flip":  "Funziona solo con acquisto molto basso e lavori contenuti.",
-    "micro":  "Forti: Via Lomellina (2.249), Viale Toscana (2.181), Viale Romagna (2.168). Deboli: Via Arbasi (1.606), Via dell\u0027Olmo (1.609), Via Rossini (1.610).",
-  "poly": [[[45.25,9.5],[45.3053,9.5],[45.3053,9.5079],[45.25,9.5079]],[[45.25,9.5079],[45.305,9.5079],[45.305,9.6],[45.25,9.6]]]
-},
-{
-    "k":  "Torretta, Martinetta, San Grato",
-    "ask":  1934,
-    "yoy":  3.6,
-    "n":  41,
-    "rent":  11.01,
-    "pos":  "Nord-ovest lungo Viale Milano; San Grato è una frazione più a ovest",
-    "score":  "basso",
-    "pro":  [
-                "Uscita rapida verso Milano da Viale Milano",
-                "Prezzi bassi, villette e piccoli condomini"
-            ],
-    "contro":  [
-                   "Crescita lenta: +3,6% in un anno",
-                   "San Grato è staccata dalla città: vie tra 1.500 e 1.850 €/mq",
-                   "Traffico di attraversamento su Viale Milano"
-               ],
-    "flip":  "Da evitare come prima zona. Eccezione: Viale Milano nel tratto vicino al centro.",
-    "micro":  "Più alta: Viale Milano (2.081). Deboli: Via Cesare Sacchi (1.531), Viale Napoli (1.642).",
-  "poly": [[[45.3195,9.4],[45.37,9.4],[45.37,9.5079],[45.3195,9.5079]]]
-}
+    {
+        "k":  "Centro Storico",
+        "ask":  2727,
+        "yoy":  20.6,
+        "n":  109,
+        "rent":  11.23,
+        "pos":  "Dentro i viali, da Piazza della Vittoria all\u0027Adda",
+        "score":  "alto",
+        "pro":  [
+                    "Duomo, Piazza della Vittoria, negozi e scuole a piedi",
+                    "Stazione a circa 600 m da Piazza della Vittoria",
+                    "Prezzi in crescita più che altrove: +20,6% in un anno",
+                    "Il ristrutturato si rivende al prezzo più alto della città e in fretta"
+                ],
+        "contro":  [
+                       "Il vecchio costa già caro: il 50% della rivendita è difficile da ottenere",
+                       "ZTL e parcheggio: cantiere più costoso (suolo pubblico, montascale, permessi)",
+                       "Palazzi storici spesso senza ascensore e con negozi o locali al piano terra",
+                       "Metri spesso gonfiati negli annunci (Via Strepponi: 119 dichiarati, 104 reali)"
+                   ],
+        "flip":  "Margine più alto in euro e rivendita veloce. Le occasioni sono poche: quando c\u0027è il prezzo giusto va presa subito.",
+        "micro":  "Il lato verso l\u0027Adda (Via San Francesco d\u0027Assisi, Piazza Ospitale, Piazzale Barzaghi) e l\u0027asse di Corso Umberto valgono di più. Verso la stazione (Piazza Zaninelli) si scende di 400-450 €/mq."
+    },
+    {
+        "k":  "Città Bassa, Laghi",
+        "ask":  2306,
+        "yoy":  19.4,
+        "n":  86,
+        "rent":  11.43,
+        "pos":  "Bordo nord del centro (Via Defendente, Via Dieci Maggio) e sponda est oltre il ponte: Borgo Adda, Laghi, Ospedale Maggiore",
+        "score":  "alto",
+        "pro":  [
+                    "A un ponte dal centro: si vende come \u0027vicino al centro\u0027 a prezzi più bassi",
+                    "Ospedale Maggiore: domanda di medici, infermieri e personale, anche in affitto",
+                    "Lungo Adda e verde fluviale",
+                    "Seconda zona per crescita: +19,4% in un anno, affitti più alti della città"
+                ],
+        "contro":  [
+                       "Vicino al fiume: verificare sempre il rischio idraulico (mappe di pericolosità PGRA) per piani bassi e cantine",
+                       "Traffico sul ponte e sull\u0027asse dell\u0027ospedale",
+                       "Valori molto diversi da via a via: da 1.782 a 2.846 €/mq"
+                   ],
+        "flip":  "Zona in ascesa, ma la via decide tutto. Laghi e Dieci Maggio tirano, Vistarini e Massena restano indietro.",
+        "micro":  "Forti: Via Dieci Maggio (2.846), Via Francesco Cagnola (2.616), Via Lago di Costanza (2.416). Deboli: Via Vistarini (1.782), Largo Donatori del Sangue (1.903)."
+    },
+    {
+        "k":  "Braila, Stazione",
+        "ask":  2158,
+        "yoy":  3.3,
+        "n":  40,
+        "rent":  10.19,
+        "pos":  "Tra il centro e la ferrovia: Corso Mazzini, Viale Agnelli, Viale Vignati, Viale Rimembranze",
+        "score":  "medio",
+        "pro":  [
+                    "Stazione: treni per Milano a pochi passi",
+                    "Il centro si raggiunge a piedi",
+                    "Molto stock anni \u002760-\u002770 da ristrutturare a prezzi sotto il centro"
+                ],
+        "contro":  [
+                       "Crescita lenta: +3,3% in un anno",
+                       "Rumore della ferrovia nelle vie a ridosso dei binari",
+                       "Condomini con riscaldamento centralizzato e spese alte (233 €/mese in Viale Rimembranze 38)"
+                   ],
+        "flip":  "Buona per un acquirente pendolare. Puntare sulle vie verso il centro, evitare il fronte binari.",
+        "micro":  "Forti: Viale Sant\u0027Angelo (2.462), Viale Trento e Trieste (2.332), Viale Vignati (2.287). Debole: Viale Milite Ignoto (1.922)."
+    },
+    {
+        "k":  "Fanfani",
+        "ask":  2077,
+        "yoy":  6.2,
+        "n":  45,
+        "rent":  10.11,
+        "pos":  "Ovest del centro, quartiere INA-Casa nato dal 1955; il bordo est tocca il centro",
+        "score":  "medio-alto",
+        "pro":  [
+                    "Tra le zone più richieste dalle famiglie insieme a San Fereolo",
+                    "Il bordo verso il centro ha prezzi da centro: Via Foscolo, Via D\u0027Azeglio, Viale Montessori",
+                    "Quartiere residenziale con servizi e scuole",
+                    "Vecchio anni \u002750-\u002760 a prezzi bassi: forbice ampia con il ristrutturato"
+                ],
+        "contro":  [
+                       "Case INA-Casa: tagli piccoli, spesso senza ascensore, impianti da rifare",
+                       "Nel cuore del quartiere il ristrutturato vale 1.900-2.100 €/mq",
+                       "Acquirenti con budget più contenuto"
+                   ],
+        "flip":  "Zona da volumi: comprare bene il vecchio fino al 2° piano senza ascensore. La microzona premium è il bordo verso il centro.",
+        "micro":  "Forti: Via Ugo Foscolo (3.316, spinta dal nuovo), Via D\u0027Azeglio (2.673), Via Ungaretti (2.640), Viale Montessori (2.625). Deboli: Via Cadamosto (1.841), Via Sant\u0027Alberto (1.905)."
+    },
+    {
+        "k":  "San Fereolo, Albarola, Faustina",
+        "ask":  1976,
+        "yoy":  12.3,
+        "n":  116,
+        "rent":  11.22,
+        "pos":  "Sud-ovest oltre la ferrovia: Viale Pavia, Via Spelta, Viale Papa Giovanni XXIII, area ex ABB",
+        "score":  "medio",
+        "pro":  [
+                    "Tra le zone più richieste dalle famiglie",
+                    "Crescita solida: +12,3% in un anno",
+                    "Nuove costruzioni (area ex ABB \u0027Isole Verdi\u0027) che migliorano l\u0027immagine della zona",
+                    "Tanta offerta (116 annunci): più scelta e più margine di trattativa"
+                ],
+        "contro":  [
+                       "La ferrovia la separa dal centro",
+                       "In rivendita si compete con il nuovo",
+                       "Molti condomini anni \u002770-\u002780 con piani alti senza ascensore"
+                   ],
+        "flip":  "Buona sulle vie forti, dove il ristrutturato supera i 2.400 €/mq.",
+        "micro":  "Forti: Via Maestri del Lavoro (2.454), Via Dunieri (2.417), Via Todisco (2.416). Debole: Via Luigi Bay (1.480)."
+    },
+    {
+        "k":  "Revellino, Campo Marte",
+        "ask":  1987,
+        "yoy":  10.1,
+        "n":  52,
+        "rent":  8.18,
+        "pos":  "Sponda est a nord dell\u0027ospedale (Via Cavallotti, Via Borsellino) fino alle frazioni Riolo e Fontana",
+        "score":  "selettivo",
+        "pro":  [
+                    "Vie nuove ad alto valore vicino all\u0027ospedale: Via Hayez, Via Scuri",
+                    "Crescita del 10% in un anno",
+                    "Più spazio e verde, molte villette"
+                ],
+        "contro":  [
+                       "Frazioni quasi rurali (Riolo, Fontana) con rivendita lenta",
+                       "Per il centro si passa dal ponte sull\u0027Adda",
+                       "Affitti tra i più bassi",
+                       "I valori alti sono del nuovo: l\u0027usato ristrutturato non ci arriva"
+                   ],
+        "flip":  "Solo nelle vie vicine a ospedale e Laghi. Evitare le frazioni.",
+        "micro":  "Forti: Via Hayez (2.807), Via Scuri (2.722), Via Arisi (2.525). Deboli: Via Caponnetto (1.659), Viale Piave (1.698)."
+    },
+    {
+        "k":  "San Bernardo, Olmo",
+        "ask":  1927,
+        "yoy":  8.3,
+        "n":  54,
+        "rent":  9.51,
+        "pos":  "Sud e sud-est: Viale Italia, Viale Calabria, Viale Lombardia, Viale Piacenza, centro sportivo Faustina",
+        "score":  "basso",
+        "pro":  [
+                    "Prezzi d\u0027ingresso tra i più bassi",
+                    "Condomini anni \u002760-\u002770 spesso con ascensore e box",
+                    "Centro sportivo Faustina e servizi di quartiere"
+                ],
+        "contro":  [
+                       "Rivendita bassa: mediana delle vie intorno a 1.850 €/mq, margine stretto in euro",
+                       "Viale Piacenza trafficato, aree produttive verso sud-est",
+                       "Domanda di affitto debole"
+                   ],
+        "flip":  "Funziona solo con acquisto molto basso e lavori contenuti.",
+        "micro":  "Forti: Via Lomellina (2.249), Viale Toscana (2.181), Viale Romagna (2.168). Deboli: Via Arbasi (1.606), Via dell\u0027Olmo (1.609), Via Rossini (1.610)."
+    },
+    {
+        "k":  "Torretta, Martinetta, San Grato",
+        "ask":  1934,
+        "yoy":  3.6,
+        "n":  41,
+        "rent":  11.01,
+        "pos":  "Nord-ovest lungo Viale Milano; San Grato è una frazione più a ovest",
+        "score":  "basso",
+        "pro":  [
+                    "Uscita rapida verso Milano da Viale Milano",
+                    "Prezzi bassi, villette e piccoli condomini"
+                ],
+        "contro":  [
+                       "Crescita lenta: +3,6% in un anno",
+                       "San Grato è staccata dalla città: vie tra 1.500 e 1.850 €/mq",
+                       "Traffico di attraversamento su Viale Milano"
+                   ],
+        "flip":  "Da evitare come prima zona. Eccezione: Viale Milano nel tratto vicino al centro.",
+        "micro":  "Più alta: Viale Milano (2.081). Deboli: Via Cesare Sacchi (1.531), Viale Napoli (1.642)."
+    }
 ]

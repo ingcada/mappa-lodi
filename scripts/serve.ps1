@@ -10,6 +10,16 @@ Write-Host "Mappa Lodi su http://localhost:$Port/"
 while ($l.IsListening) {
   $c = $l.GetContext()
   $rel = [Uri]::UnescapeDataString($c.Request.Url.AbsolutePath.TrimStart('/'))
+  # Salvataggio file dagli script di build (solo cartella data\, solo in locale)
+  if ($rel -eq '__save' -and $c.Request.HttpMethod -eq 'POST') {
+    $dest = Join-Path $root ($c.Request.QueryString['f'] -replace '/', '\')
+    if ($dest.StartsWith((Join-Path $root 'data\'))) {
+      $sr = [IO.StreamReader]::new($c.Request.InputStream, [Text.Encoding]::UTF8)
+      [IO.File]::WriteAllText($dest, $sr.ReadToEnd(), [Text.UTF8Encoding]::new($false))
+      $c.Response.StatusCode = 200
+    } else { $c.Response.StatusCode = 403 }
+    $c.Response.Close(); continue
+  }
   if ($rel -eq '') { $rel = 'index.html' }
   $f = Join-Path $root $rel
   if ((Test-Path $f -PathType Leaf) -and $f.StartsWith($root)) {

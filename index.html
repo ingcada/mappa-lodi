@@ -24,7 +24,6 @@
 <body>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 <script src="data/base.js"></script>
 <script>
 const map = L.map('map').setView([45.314, 9.503], 14);
@@ -32,31 +31,6 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
-
-// --- Confine comunale: i way OSM vengono uniti in anelli chiusi ---
-function anelli(ways) {
-  const same = (a, b) => a[0] === b[0] && a[1] === b[1];
-  const rest = ways.map(w => w.slice()), out = [];
-  while (rest.length) {
-    let r = rest.shift(), found = true;
-    while (found && !same(r[0], r[r.length - 1])) {
-      found = false;
-      for (let i = 0; i < rest.length; i++) {
-        const w = rest[i], last = r[r.length - 1];
-        if (same(last, w[0])) r = r.concat(w.slice(1));
-        else if (same(last, w[w.length - 1])) r = r.concat(w.slice().reverse().slice(1));
-        else if (same(r[0], w[w.length - 1])) r = w.slice(0, -1).concat(r);
-        else if (same(r[0], w[0])) r = w.slice().reverse().slice(0, -1).concat(r);
-        else continue;
-        rest.splice(i, 1); found = true; break;
-      }
-    }
-    if (!same(r[0], r[r.length - 1])) r.push(r[0]);
-    out.push(r);
-  }
-  return out;
-}
-const comune = turf.multiPolygon(anelli(BASE.confine).map(r => [r.map(([la, lo]) => [lo, la])]));
 
 // --- Macrozone: colore per €/mq richiesto ---
 const STOPS = ['#ffffb2', '#fecc5c', '#fd8d3c', '#f03b20', '#bd0026'];
@@ -69,14 +43,14 @@ function colore(v, min, max) {
 const eur = n => n.toLocaleString('it-IT');
 const lista = a => '<ul>' + a.map(x => `<li>${x}</li>`).join('') + '</ul>';
 
-fetch('data/zone.json').then(r => r.json()).then(zone => {
+Promise.all([fetch('data/zone.json').then(r => r.json()), fetch('data/zone-poly.json').then(r => r.json())]).then(([zone, poligoni]) => {
   const prezzi = zone.map(z => z.ask), min = Math.min(...prezzi), max = Math.max(...prezzi);
   const gruppo = L.layerGroup().addTo(map);
   zone.forEach(z => {
-    const pezzi = z.poly.map(r => turf.intersect(turf.polygon([r.map(([la, lo]) => [lo, la]).concat([[r[0][1], r[0][0]]])]), comune)).filter(Boolean);
+    const pezzi = poligoni.features.filter(f => f.properties.k === z.k);
     if (!pezzi.length) return;
     const col = colore(z.ask, min, max);
-    L.geoJSON({ type: 'FeatureCollection', features: pezzi }, { style: { color: '#555', weight: 1.5, fillColor: col, fillOpacity: .6 } })
+    L.geoJSON({ type: 'FeatureCollection', features: pezzi }, { style: { color: '#555', weight: 1, fillColor: col, fillOpacity: .6 } })
       .addTo(gruppo)
       .bindTooltip(`${z.k}: ${eur(z.ask)} €/mq`, { sticky: true })
       .bindPopup(`<div class="pop"><h3>${z.k}</h3>
