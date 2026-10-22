@@ -166,6 +166,8 @@ function anelli(ways) {
   for (const k of Object.keys(acc)) {
     let u = acc[k][0];
     for (let i = 1; i < acc[k].length; i++) { try { u = turf.union(u, acc[k][i]) || u; } catch (e) {} }
+    // chiude le fessure tra pezzi vicini della stessa zona (niente bordi interni)
+    try { u = turf.buffer(turf.buffer(u, 0.003, { units: 'kilometers' }), -0.003, { units: 'kilometers' }); } catch (e) {}
     u = turf.truncate(turf.simplify(u, { tolerance: 0.00001, highQuality: false }), { precision: 5 });
     u.properties = { k };
     features.push(u);
