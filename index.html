@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mappa valori Lodi</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
+  #map { height: 100%; }
+  .legenda { background: #fff; padding: 8px 10px; border-radius: 6px; font-size: 13px; line-height: 1.6; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+  .legenda i { display: inline-block; width: 22px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 6px; }
+  .legenda small { color: #666; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="data/base.js"></script>
+<script>
+const map = L.map('map').setView([45.314, 9.503], 14);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+
+const confine = L.polyline(BASE.confine, { color: '#c0392b', weight: 3, dashArray: '8 5' }).addTo(map).bindTooltip('Confine comunale di Lodi');
+const adda = L.polyline(BASE.adda, { color: '#1f6fd1', weight: 5, opacity: .8 }).addTo(map).bindTooltip('Fiume Adda');
+const ferrovia = L.polyline(BASE.ferrovia, { color: '#333', weight: 3, dashArray: '2 6' }).addTo(map).bindTooltip('Ferrovia Milano–Bologna');
+
+BASE.punti.forEach(p =>
+  L.circleMarker(p.c, { radius: 8, color: '#fff', weight: 2, fillColor: '#e67e22', fillOpacity: 1 })
+    .addTo(map).bindPopup(`<b>${p.n}</b><br><small>Fonte: OpenStreetMap (${p.osm})</small>`)
+);
+
+map.fitBounds(confine.getBounds());
+
+const leg = L.control({ position: 'bottomleft' });
+leg.onAdd = () => {
+  const d = L.DomUtil.create('div', 'legenda');
+  d.innerHTML = '<b>Mappa valori Lodi</b><br>' +
+    '<i style="border-color:#c0392b;border-top-style:dashed"></i>Confine comunale<br>' +
+    '<i style="border-color:#1f6fd1"></i>Adda<br>' +
+    '<i style="border-color:#333;border-top-style:dotted"></i>Ferrovia<br>' +
+    '<span style="color:#e67e22">&#9679;</span> Punti di riferimento<br>' +
+    `<small>Dati geometrici: OpenStreetMap, Overpass API, ${BASE.data}</small>`;
+  return d;
+};
+leg.addTo(map);
+</script>
+</body>
+</html>
