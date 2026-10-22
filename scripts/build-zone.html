@@ -153,6 +153,15 @@ function anelli(ways) {
   });
   avanzoFuori.forEach(p => { for (const z in regioni) tagli(p, regioni[z]).forEach(q => add(z, q)); });
 
+  // correzioni manuali (data/zone-override.json): l'area indicata passa alla zona scelta
+  const corr = await (await fetch('/data/zone-override.json')).json();
+  corr.forEach(c => {
+    const P = turf.polygon([c.poly]);
+    for (const k of Object.keys(acc)) acc[k] = acc[k].flatMap(p => meno(p, P));
+    tagli(comune, P).forEach(q => add(c.k, q));
+    log('correzione manuale -> ' + c.k + ': ' + Math.round(turf.area(P) / 1e4) / 100 + ' km2');
+  });
+
   const features = [];
   for (const k of Object.keys(acc)) {
     let u = acc[k][0];
