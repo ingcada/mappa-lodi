@@ -33,13 +33,11 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 // --- Macrozone: colore per €/mq richiesto ---
-const STOPS = ['#ffffb2', '#fecc5c', '#fd8d3c', '#f03b20', '#bd0026'];
-function colore(v, min, max) {
-  const x = (v - min) / (max - min) * (STOPS.length - 1), i = Math.min(Math.floor(x), STOPS.length - 2);
-  const a = STOPS[i], b = STOPS[i + 1], f = x - i;
-  const h = s => [1, 3, 5].map(k => parseInt(s.substr(k, 2), 16));
-  return '#' + h(a).map((c, k) => Math.round(c + (h(b)[k] - c) * f).toString(16).padStart(2, '0')).join('');
-}
+// Scala di Immobiliare.it (legenda della sua mappa prezzi, 11 classi): < 1.800, poi classi da 100 €/mq fino a >= 2.700
+const SCALA = ['rgb(32,157,76)', 'rgb(67,161,63)', 'rgb(107,166,47)', 'rgb(148,172,31)', 'rgb(187,177,16)', 'rgb(228,181,0)',
+               'rgb(221,152,12)', 'rgb(214,121,25)', 'rgb(207,92,36)', 'rgb(200,61,49)', 'rgb(194,33,60)'];
+const classe = v => v < 1800 ? 0 : v >= 2700 ? 10 : Math.floor((v - 1800) / 100) + 1;
+const colore = v => SCALA[classe(v)];
 const eur = n => n.toLocaleString('it-IT');
 const lista = a => '<ul>' + a.map(x => `<li>${x}</li>`).join('') + '</ul>';
 
@@ -49,8 +47,8 @@ Promise.all([fetch('data/zone.json').then(r => r.json()), fetch('data/zone-poly.
   zone.forEach(z => {
     const pezzi = poligoni.features.filter(f => f.properties.k === z.k);
     if (!pezzi.length) return;
-    const col = colore(z.ask, min, max);
-    L.geoJSON({ type: 'FeatureCollection', features: pezzi }, { style: { color: '#555', weight: 1, fillColor: col, fillOpacity: .6 } })
+    const col = colore(z.ask);
+    L.geoJSON({ type: 'FeatureCollection', features: pezzi }, { style: { color: '#fff', weight: 2, fillColor: col, fillOpacity: .6 } })
       .addTo(gruppo)
       .bindTooltip(`${z.k}: ${eur(z.ask)} €/mq`, { sticky: true })
       .bindPopup(`<div class="pop"><h3>${z.k}</h3>
@@ -66,8 +64,9 @@ Promise.all([fetch('data/zone.json').then(r => r.json()), fetch('data/zone-poly.
   const leg = L.control({ position: 'bottomleft' });
   leg.onAdd = () => {
     const d = L.DomUtil.create('div', 'legenda');
-    const sw = [0, .25, .5, .75, 1].map(f => `<span class="sw" style="background:${colore(min + (max - min) * f, min, max)}"></span>${eur(Math.round(min + (max - min) * f))}`).join('<br>');
-    d.innerHTML = '<b>Mappa valori Lodi</b><br><b>€/mq richiesto per zona</b><br>' + sw + '<br>' +
+    const sw = SCALA.map(c => `<span style="display:inline-block;width:16px;height:10px;background:${c};opacity:.75"></span>`).join('');
+    d.innerHTML = '<b>Mappa valori Lodi</b><br><b>€/mq richiesto per zona</b><br>' + sw +
+      '<br><small style="display:flex;justify-content:space-between;width:176px"><span>&lt; 1.800</span><span>&ge; 2.700</span></small>' +
       '<i style="border-color:#c0392b;border-top-style:dashed"></i>Confine comunale<br>' +
       '<i style="border-color:#1f6fd1"></i>Adda<br>' +
       '<i style="border-color:#333;border-top-style:dotted"></i>Ferrovia<br>' +
