@@ -5,102 +5,117 @@
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 <script src="../data/base.js"></script>
 <script>
-// Genera data/zone-poly.json: le macrozone seguono la rete stradale reale (OSM).
-// 1) le strade formano gli isolati (poligonize); 2) ogni isolato prende la zona
-// secondo le regole di assegnazione del brief applicate al suo punto interno;
-// 3) isolati molto grandi e aree fuori dagli isolati sono tagliati con le soglie del brief.
+// Genera data/zone-poly.json: le macrozone seguono la rete stradale reale (OSM) e la
+// suddivisione di mercato di Immobiliare.it, cioe' la zona di ciascuna via in data/vie.json.
+// 1) le strade formano gli isolati (poligonize);
+// 2) un isolato prende la zona delle vie elencate che lo delimitano (voto sui suoi vertici);
+// 3) gli isolati senza vie elencate prendono la zona dei vicini (propagazione), poi della via piu' vicina;
+// 4) le aree del comune fuori dagli isolati prendono la zona della via elencata piu' vicina.
 // Uso: servire il progetto con scripts/serve.ps1 e aprire /scripts/build-zone.html
 const log = m => { document.getElementById('log').textContent += m + '\n'; console.log(m); };
-const AREA_MAX = 5000000; // m2: sopra questa soglia l'isolato non e' assegnato per intero
-
-function zoneAt(la, lo) {
-  if (lo > 9.5079) return la > 45.3205 ? 'Revellino, Campo Marte' : la > 45.305 ? 'Città Bassa, Laghi' : 'San Bernardo, Olmo';
-  if (la > 45.3195) return 'Torretta, Martinetta, San Grato';
-  if (la > 45.3172 && lo > 9.4995) return 'Città Bassa, Laghi';
-  if (la >= 45.3095 && la <= 45.3195 && lo >= 9.4995) return 'Centro Storico';
-  if (la < 45.3053 && lo >= 9.5) return 'San Bernardo, Olmo';
-  if (la >= 45.305 && la <= 45.3095 && lo >= 9.4995) return 'Braila, Stazione';
-  if (la < 45.3095) return 'San Fereolo, Albarola, Faustina';
-  return 'Fanfani';
-}
-// Stesse regole come rettangoli in ordine di priorita' [zona, latMin, latMax, lonMin, lonMax]
-const B = { a: 45.2, b: 45.4, c: 9.35, d: 9.65 };
-const REG = [
-  ['Revellino, Campo Marte', 45.3205, B.b, 9.5079, B.d],
-  ['Città Bassa, Laghi', 45.305, 45.3205, 9.5079, B.d],
-  ['San Bernardo, Olmo', B.a, 45.305, 9.5079, B.d],
-  ['Torretta, Martinetta, San Grato', 45.3195, B.b, B.c, 9.5079],
-  ['Città Bassa, Laghi', 45.3172, 45.3195, 9.4995, 9.5079],
-  ['Centro Storico', 45.3095, 45.3195, 9.4995, 9.5079],
-  ['San Bernardo, Olmo', B.a, 45.3053, 9.5, 9.5079],
-  ['Braila, Stazione', 45.305, 45.3095, 9.4995, 9.5079],
-  ['San Fereolo, Albarola, Faustina', B.a, 45.3095, B.c, 9.5079],
-  ['Fanfani', B.a, B.b, B.c, 9.5079],
-];
-const rect = (a, b, c, d) => turf.bboxPolygon([c, a, d, b]);
-const acc = {}; // zona -> feature[]
-const add = (k, f) => { if (f) (acc[k] = acc[k] || []).push(f); };
+const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const key = c => c[0] + ',' + c[1];
 const polys = f => !f ? [] : f.geometry.type === 'Polygon' ? [f] : f.geometry.coordinates.map(c => turf.polygon(c));
 
-function spezza(f) {
-  let rest = f;
-  for (const [k, a, b, c, d] of REG) {
-    if (!rest) break;
-    const r = rect(a, b, c, d);
-    const part = turf.intersect(rest, r);
-    if (part && turf.area(part) > 1) polys(part).forEach(p => add(k, p));
-    rest = turf.difference(rest, r);
+function anelli(ways) {
+  const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+  const rest = ways.map(w => w.slice()), out = [];
+  while (rest.length) {
+    let r = rest.shift(), found = true;
+    while (found && !same(r[0], r[r.length - 1])) {
+      found = false;
+      for (let i = 0; i < rest.length; i++) {
+        const w = rest[i], last = r[r.length - 1];
+        if (same(last, w[0])) r = r.concat(w.slice(1));
+        else if (same(last, w[w.length - 1])) r = r.concat(w.slice().reverse().slice(1));
+        else if (same(r[0], w[w.length - 1])) r = w.slice(0, -1).concat(r);
+        else if (same(r[0], w[0])) r = w.slice().reverse().slice(0, -1).concat(r);
+        else continue;
+        rest.splice(i, 1); found = true; break;
+      }
+    }
+    if (!same(r[0], r[r.length - 1])) r.push(r[0]);
+    out.push([r.map(([la, lo]) => [lo, la])]);
   }
-}
-function assegna(f) {
-  if (turf.area(f) > AREA_MAX) return spezza(f);
-  const [lo, la] = turf.pointOnFeature(f).geometry.coordinates;
-  add(zoneAt(la, lo), f);
+  return out;
 }
 
 (async () => {
   const raw = await (await fetch('/scripts/cache/strade.raw.json')).json();
-  const linee = turf.featureCollection(raw.elements.filter(e => e.geometry && e.geometry.length > 1)
-    .map(e => turf.lineString(e.geometry.map(p => [p.lon, p.lat]))));
-  log('strade: ' + linee.features.length);
-  const comune = turf.multiPolygon(BASE.confine.length ? (() => {
-    // anelli dal confine OSM (stesso unione del sito)
-    const same = (a, b) => a[0] === b[0] && a[1] === b[1];
-    const rest = BASE.confine.map(w => w.slice()), out = [];
-    while (rest.length) {
-      let r = rest.shift(), found = true;
-      while (found && !same(r[0], r[r.length - 1])) {
-        found = false;
-        for (let i = 0; i < rest.length; i++) {
-          const w = rest[i], last = r[r.length - 1];
-          if (same(last, w[0])) r = r.concat(w.slice(1));
-          else if (same(last, w[w.length - 1])) r = r.concat(w.slice().reverse().slice(1));
-          else if (same(r[0], w[w.length - 1])) r = w.slice(0, -1).concat(r);
-          else if (same(r[0], w[0])) r = w.slice().reverse().slice(0, -1).concat(r);
-          else continue;
-          rest.splice(i, 1); found = true; break;
-        }
-      }
-      if (!same(r[0], r[r.length - 1])) r.push(r[0]);
-      out.push([r.map(([la, lo]) => [lo, la])]);
+  const vie = await (await fetch('/data/vie.json')).json();
+  const ways = raw.elements.filter(e => e.geometry && e.geometry.length > 1)
+    .map(e => ({ nome: norm(e.tags.name || ''), c: e.geometry.map(p => [p.lon, p.lat]) }));
+  const linee = turf.featureCollection(ways.map(w => turf.lineString(w.c)));
+  const comune = turf.multiPolygon(anelli(BASE.confine));
+
+  // --- vie elencate -> way OSM (per nome; altrimenti il way piu' vicino al punto, entro 80 m)
+  const semi = []; // {zona, c}
+  let perNome = 0, perPunto = 0, perso = 0;
+  vie.forEach(v => {
+    let sel = ways.filter(w => w.nome && w.nome === norm(v.n));
+    if (sel.length) perNome++;
+    else {
+      const p = turf.point([v.lon, v.lat]); let best = null, bd = 0.08;
+      ways.forEach(w => { const d = turf.pointToLineDistance(p, turf.lineString(w.c), { units: 'kilometers' }); if (d < bd) { bd = d; best = w; } });
+      if (best) { sel = [best]; perPunto++; } else perso++;
     }
-    return out;
-  })() : []);
-
-  const facce = turf.polygonize(linee);
-  log('isolati: ' + facce.features.length);
-  const dentro = [];
-  facce.features.forEach(f => {
-    let x; try { x = turf.intersect(f, comune); } catch (e) { return; }
-    polys(x).forEach(p => { dentro.push(p); assegna(p); });
+    sel.forEach(w => semi.push({ zona: v.z, c: w.c }));
   });
-  log('isolati nel comune: ' + dentro.length);
+  log(`vie: ${vie.length} (per nome ${perNome}, per punto ${perPunto}, non trovate ${perso}); tratti di via: ${semi.length}`);
+  const semiLinee = semi.map(s => ({ zona: s.zona, f: turf.lineString(s.c) }));
+  const piuVicina = pt => { let bz = null, bd = 1e9; semiLinee.forEach(s => { const d = turf.pointToLineDistance(pt, s.f); if (d < bd) { bd = d; bz = s.zona; } }); return bz; };
 
-  // aree del comune non coperte da isolati
+  // --- voti: ogni vertice di via elencata porta la sua zona
+  const vv = new Map();
+  semi.forEach(s => s.c.forEach(c => { const k = key(c), m = vv.get(k) || {}; m[s.zona] = (m[s.zona] || 0) + 1; vv.set(k, m); }));
+
+  const facce = turf.polygonize(linee).features;
+  log('isolati: ' + facce.length);
+  const anelloK = f => f.geometry.coordinates[0].map(key);
+  const zona = new Array(facce.length).fill(null);
+  const perVertice = new Map();
+  facce.forEach((f, i) => anelloK(f).forEach(k => { (perVertice.get(k) || perVertice.set(k, []).get(k)).push(i); }));
+  facce.forEach((f, i) => {
+    const t = {}; anelloK(f).forEach(k => { const m = vv.get(k); if (m) for (const z in m) t[z] = (t[z] || 0) + m[z]; });
+    const z = Object.keys(t).sort((a, b) => t[b] - t[a])[0]; if (z) zona[i] = z;
+  });
+  log('isolati con via elencata: ' + zona.filter(Boolean).length);
+
+  // --- propagazione dai vicini
+  for (let giro = 0; giro < 60; giro++) {
+    const nuovo = [];
+    facce.forEach((f, i) => {
+      if (zona[i]) return;
+      const t = {}; anelloK(f).forEach(k => perVertice.get(k).forEach(j => { if (j !== i && zona[j]) t[zona[j]] = (t[zona[j]] || 0) + 1; }));
+      const z = Object.keys(t).sort((a, b) => t[b] - t[a])[0]; if (z) nuovo.push([i, z]);
+    });
+    if (!nuovo.length) break;
+    nuovo.forEach(([i, z]) => zona[i] = z);
+  }
+  let resto = 0;
+  facce.forEach((f, i) => { if (!zona[i]) { zona[i] = piuVicina(turf.pointOnFeature(f)); resto++; } });
+  log('isolati assegnati per vicinanza: ' + resto);
+
+  const acc = {}; const add = (k, f) => { if (f && k) (acc[k] = acc[k] || []).push(f); };
+  const dentro = [];
+  facce.forEach((f, i) => {
+    let x; try { x = turf.intersect(f, comune); } catch (e) { return; }
+    polys(x).forEach(p => { dentro.push(p); add(zona[i], p); });
+  });
   let coperto = dentro[0];
   for (let i = 1; i < dentro.length; i++) { try { coperto = turf.union(coperto, dentro[i]) || coperto; } catch (e) {} }
-  const resto = turf.difference(comune, coperto);
-  polys(resto).forEach(p => spezza(p));
+  // fuori dagli isolati: diagramma di Voronoi dei punti delle vie elencate (una zona per cella)
+  const punti = [], visti = new Set();
+  semi.forEach(s => s.c.forEach(c => { const k = c[0].toFixed(3) + ',' + c[1].toFixed(3); if (!visti.has(k)) { visti.add(k); punti.push(turf.point(c, { z: s.zona })); } }));
+  const vor = turf.voronoi(turf.featureCollection(punti), { bbox: [9.3, 45.2, 9.7, 45.4] });
+  const celle = {};
+  vor.features.forEach((cella, i) => { if (cella) (celle[punti[i].properties.z] = celle[punti[i].properties.z] || []).push(cella); });
+  const avanzo = polys(turf.difference(comune, coperto));
+  for (const z in celle) {
+    let reg = celle[z][0];
+    for (let i = 1; i < celle[z].length; i++) { try { reg = turf.union(reg, celle[z][i]) || reg; } catch (e) {} }
+    avanzo.forEach(p => { let x; try { x = turf.intersect(p, reg); } catch (e) { return; } polys(x).forEach(q => add(z, q)); });
+  }
 
   const features = [];
   for (const k of Object.keys(acc)) {
@@ -111,8 +126,7 @@ function assegna(f) {
     features.push(u);
     log(k + ': ' + acc[k].length + ' pezzi, ' + Math.round(turf.area(u) / 1e4) / 100 + ' km2');
   }
-  const out = turf.featureCollection(features);
-  const body = JSON.stringify(out);
+  const body = JSON.stringify(turf.featureCollection(features));
   const r = await fetch('/__save?f=data/zone-poly.json', { method: 'POST', body });
   log('salvato: ' + r.status + ' (' + Math.round(body.length / 1024) + ' KB)');
 })().catch(e => log('ERRORE ' + e + '\n' + e.stack));

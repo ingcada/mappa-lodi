@@ -46,10 +46,10 @@
     },
     {
         "k":  "Braila, Stazione",
-        "ask":  2158,
-        "yoy":  3.3,
+        "ask":  2135,
+        "yoy":  2.5,
         "n":  40,
-        "rent":  10.19,
+        "rent":  10.13,
         "pos":  "Tra il centro e la ferrovia: Corso Mazzini, Viale Agnelli, Viale Vignati, Viale Rimembranze",
         "score":  "medio",
         "pro":  [
@@ -58,7 +58,7 @@
                     "Molto stock anni \u002760-\u002770 da ristrutturare a prezzi sotto il centro"
                 ],
         "contro":  [
-                       "Crescita lenta: +3,3% in un anno",
+                       "Crescita lenta: +2,5% in un anno",
                        "Rumore della ferrovia nelle vie a ridosso dei binari",
                        "Condomini con riscaldamento centralizzato e spese alte (233 €/mese in Viale Rimembranze 38)"
                    ],
