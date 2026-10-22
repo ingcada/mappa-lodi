@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Allineamento schermata Immobiliare.it</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>html,body,#map{height:100%;margin:0}</style>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Sovrappone ref/immobiliare-lodi.png (schermata della mappa zone) alla mappa OSM per ricalcarne i confini.
+// Il file e' una schermata Web Mercator, nord in alto: bastano due angoli (alto-sinistra, basso-destra).
+const W = 991, H = 880;
+const merc = (la, lo) => { const s = Math.sin(la * Math.PI / 180); return [lo, 0.5 * Math.log((1 + s) / (1 - s)) * 180 / Math.PI]; };
+const inv = (x, y) => [(2 * Math.atan(Math.exp(y * Math.PI / 180)) - Math.PI / 2) * 180 / Math.PI, x];
+// stima iniziale: stazione di Lodi (45.30921, 9.49769) al pixel (399, 586), zoom 15 a 256 px
+const P = new URLSearchParams(location.search);
+const gx = 360 / (256 * Math.pow(2, +(P.get('z') || 15)));      // gradi di longitudine per pixel
+const ax = +(P.get('ax') || 399), ay = +(P.get('ay') || 586);   // pixel della stazione
+const [mx0, my0] = merc(45.30921, 9.49769);
+const tl = inv(mx0 - ax * gx, my0 + ay * gx), br = inv(mx0 + (W - ax) * gx, my0 - (H - ay) * gx);
+window.map = L.map('map').setView([45.3135, 9.503], 15);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+window.ov = L.imageOverlay('/ref/immobiliare-lodi.png', [tl, br], { opacity: +(P.get('o') || .5) }).addTo(map);
+</script>

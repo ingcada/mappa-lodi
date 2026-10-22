@@ -63,7 +63,15 @@ function anelli(ways) {
   });
   log(`vie: ${vie.length} (per nome ${perNome}, per punto ${perPunto}, non trovate ${perso}); tratti di via: ${semi.length}`);
   const semiLinee = semi.map(s => ({ zona: s.zona, f: turf.lineString(s.c) }));
-  const piuVicina = pt => { let bz = null, bd = 1e9; semiLinee.forEach(s => { const d = turf.pointToLineDistance(pt, s.f); if (d < bd) { bd = d; bz = s.zona; } }); return bz; };
+  const piuVicina = (pt, escl) => { let bz = null, bd = 1e9; semiLinee.forEach(s => { if (escl && escl.has(s.zona)) return; const d = turf.pointToLineDistance(pt, s.f); if (d < bd) { bd = d; bz = s.zona; } }); return bz; };
+
+  // --- schermata di Immobiliare.it (data/zone-ref.json): dentro la sua area le zone ricalcate comandano
+  const rif = await (await fetch('/data/zone-ref.json')).json();
+  const ext = rif.features.find(f => f.properties.k === '__extent');
+  const refs = rif.features.filter(f => f.properties.k !== '__extent');
+  const REFZ = new Set(refs.map(f => f.properties.k));
+  const inExt = pt => turf.booleanPointInPolygon(pt, ext);
+  const refDi = pt => { const f = refs.find(r => turf.booleanPointInPolygon(pt, r)); return f ? f.properties.k : null; };
 
   // --- voti: ogni vertice di via elencata porta la sua zona
   const vv = new Map();
@@ -75,9 +83,20 @@ function anelli(ways) {
   const zona = new Array(facce.length).fill(null);
   const perVertice = new Map();
   facce.forEach((f, i) => anelloK(f).forEach(k => { (perVertice.get(k) || perVertice.set(k, []).get(k)).push(i); }));
+  // isolati dentro l'area della schermata: zona ricalcata, oppure "altra zona" (mai una delle 4 ricalcate)
+  const punto = facce.map(f => turf.pointOnFeature(f));
+  const nellaSchermata = punto.map(p => inExt(p));
+  const escl = i => nellaSchermata[i] ? REFZ : null;
+  let daRif = 0; const daSchermata = new Array(facce.length).fill(false); // le zone ricalcate non si estendono fuori dalla schermata
+  // isolati grandi (> 0,15 km2): il contorno ricalcato li taglia, invece di assegnarli per intero
+  const grande = facce.map((f, i) => nellaSchermata[i] && turf.area(f) > 150000);
+  facce.forEach((f, i) => { if (nellaSchermata[i] && !grande[i]) { const z = refDi(punto[i]); if (z) { zona[i] = z; daSchermata[i] = true; daRif++; } } });
+  log(`isolati nella schermata: ${nellaSchermata.filter(Boolean).length} (di cui in una zona ricalcata: ${daRif})`);
+  const sceglie = (t, i) => { const e = escl(i); return Object.keys(t).filter(z => !(e && e.has(z))).sort((a, b) => t[b] - t[a])[0]; };
   facce.forEach((f, i) => {
+    if (zona[i]) return;
     const t = {}; anelloK(f).forEach(k => { const m = vv.get(k); if (m) for (const z in m) t[z] = (t[z] || 0) + m[z]; });
-    const z = Object.keys(t).sort((a, b) => t[b] - t[a])[0]; if (z) zona[i] = z;
+    const z = sceglie(t, i); if (z) zona[i] = z;
   });
   log('isolati con via elencata: ' + zona.filter(Boolean).length);
 
@@ -86,21 +105,29 @@ function anelli(ways) {
     const nuovo = [];
     facce.forEach((f, i) => {
       if (zona[i]) return;
-      const t = {}; anelloK(f).forEach(k => perVertice.get(k).forEach(j => { if (j !== i && zona[j]) t[zona[j]] = (t[zona[j]] || 0) + 1; }));
-      const z = Object.keys(t).sort((a, b) => t[b] - t[a])[0]; if (z) nuovo.push([i, z]);
+      const t = {}; anelloK(f).forEach(k => perVertice.get(k).forEach(j => { if (j !== i && zona[j] && !daSchermata[j]) t[zona[j]] = (t[zona[j]] || 0) + 1; }));
+      const z = sceglie(t, i); if (z) nuovo.push([i, z]);
     });
     if (!nuovo.length) break;
     nuovo.forEach(([i, z]) => zona[i] = z);
   }
   let resto = 0;
-  facce.forEach((f, i) => { if (!zona[i]) { zona[i] = piuVicina(turf.pointOnFeature(f)); resto++; } });
+  facce.forEach((f, i) => { if (!zona[i]) { zona[i] = piuVicina(punto[i], escl(i)); resto++; } });
   log('isolati assegnati per vicinanza: ' + resto);
 
   const acc = {}; const add = (k, f) => { if (f && k) (acc[k] = acc[k] || []).push(f); };
+  const tagli = (p, q) => { try { return polys(turf.intersect(p, q)); } catch (e) { return []; } };
+  const meno = (p, q) => { try { return polys(turf.difference(p, q)); } catch (e) { return [p]; } };
   const dentro = [];
   facce.forEach((f, i) => {
     let x; try { x = turf.intersect(f, comune); } catch (e) { return; }
-    polys(x).forEach(p => { dentro.push(p); add(zona[i], p); });
+    polys(x).forEach(p => {
+      dentro.push(p);
+      if (!grande[i]) return add(zona[i], p);
+      let resto = [p];
+      refs.forEach(r => { tagli(p, r).forEach(q => add(r.properties.k, q)); resto = resto.flatMap(y => meno(y, r)); });
+      resto.forEach(y => add(zona[i], y));
+    });
   });
   let coperto = dentro[0];
   for (let i = 1; i < dentro.length; i++) { try { coperto = turf.union(coperto, dentro[i]) || coperto; } catch (e) {} }
@@ -110,12 +137,21 @@ function anelli(ways) {
   const vor = turf.voronoi(turf.featureCollection(punti), { bbox: [9.3, 45.2, 9.7, 45.4] });
   const celle = {};
   vor.features.forEach((cella, i) => { if (cella) (celle[punti[i].properties.z] = celle[punti[i].properties.z] || []).push(cella); });
+  const regione = z => { let reg = celle[z][0]; for (let i = 1; i < celle[z].length; i++) { try { reg = turf.union(reg, celle[z][i]) || reg; } catch (e) {} } return reg; };
+  const regioni = {}; for (const z in celle) regioni[z] = regione(z);
   const avanzo = polys(turf.difference(comune, coperto));
-  for (const z in celle) {
-    let reg = celle[z][0];
-    for (let i = 1; i < celle[z].length; i++) { try { reg = turf.union(reg, celle[z][i]) || reg; } catch (e) {} }
-    avanzo.forEach(p => { let x; try { x = turf.intersect(p, reg); } catch (e) { return; } polys(x).forEach(q => add(z, q)); });
-  }
+  const avanzoFuori = [];
+  avanzo.forEach(p => {
+    // dentro la schermata: zone ricalcate; il resto non puo' essere una di esse
+    let resta = [p];
+    refs.forEach(r => { tagli(p, r).forEach(q => add(r.properties.k, q)); });
+    tagli(p, ext).forEach(inn => {
+      let rr = [inn]; refs.forEach(r => { rr = rr.flatMap(x => meno(x, r)); });
+      rr.forEach(x => { for (const z in regioni) if (!REFZ.has(z)) tagli(x, regioni[z]).forEach(q => add(z, q)); });
+    });
+    meno(p, ext).forEach(x => avanzoFuori.push(x));
+  });
+  avanzoFuori.forEach(p => { for (const z in regioni) tagli(p, regioni[z]).forEach(q => add(z, q)); });
 
   const features = [];
   for (const k of Object.keys(acc)) {

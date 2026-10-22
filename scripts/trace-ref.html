@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Ricalco zone da schermata Immobiliare.it</title>
+<pre id="log" style="font:13px monospace"></pre>
+<script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script>
+// Legge ref/immobiliare-lodi.png (schermata della mappa zone di Immobiliare.it, Web Mercator, nord in alto,
+// allineata con scripts/align.html) e ne ricava i poligoni delle zone dal colore di riempimento.
+// Scrive data/zone-ref.json. Uso: servire il progetto con scripts/serve.ps1 e aprire /scripts/trace-ref.html
+const log = m => { document.getElementById('log').textContent += m + '\n'; };
+const W = 991, H = 880, Z = 14.68, AX = 399, AY = 586;           // stessa taratura di align.html
+const merc = (la, lo) => { const s = Math.sin(la * Math.PI / 180); return [lo, 0.5 * Math.log((1 + s) / (1 - s)) * 180 / Math.PI]; };
+const inv = (x, y) => [(2 * Math.atan(Math.exp(y * Math.PI / 180)) - Math.PI / 2) * 180 / Math.PI, x];
+const gx = 360 / (256 * Math.pow(2, Z)), [mx0, my0] = merc(45.30921, 9.49769);
+const ll = (px, py) => { const [la, lo] = inv(mx0 + (px - AX) * gx, my0 - (py - AY) * gx); return [lo, la]; };
+
+// colore di riempimento delle zone (RGB campionati sulla schermata)
+const CLASSI = [
+  { k: 'Centro Storico', rgb: [214, 120, 133] },
+  { k: 'Città Bassa, Laghi', rgb: [233, 191, 121] },
+  { k: 'Fanfani', rgb: [187, 200, 123] },
+  { k: 'Braila, Stazione', rgb: [214, 208, 126] },
+];
+const TOL = 14;
+
+function chiudi(m, r) { // chiusura morfologica (dilata poi erodi) con finestra quadrata
+  const f = (src, val) => { const o = new Uint8Array(W * H); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let hit = 0; for (let dy = -r; dy <= r && !hit; dy++) for (let dx = -r; dx <= r; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && xx < W && yy >= 0 && yy < H && src[yy * W + xx] === val) { hit = 1; break; } }
+    o[y * W + x] = hit ? val : 1 - val; } return o; };
+  return f(f(m, 1), 0);
+}
+
+(async () => {
+  const im = new Image(); im.src = '/ref/immobiliare-lodi.png'; await im.decode();
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+  const px = g.getImageData(0, 0, W, H).data;
+  const out = [];
+  for (const cl of CLASSI) {
+    let m = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) { const d = Math.hypot(px[4 * i] - cl.rgb[0], px[4 * i + 1] - cl.rgb[1], px[4 * i + 2] - cl.rgb[2]); m[i] = d < TOL ? 1 : 0; }
+    m = chiudi(m, 5);
+    const cont = d3.contours().size([W, H]).thresholds([0.5])(Float64Array.from(m))[0];
+    const feats = cont.coordinates.map(poly => turf.polygon(poly.map(ring => { const r = ring.map(([x, y]) => ll(x, y)); return r; })))
+      .filter(f => turf.area(f) > 20000);
+    feats.forEach(f => { f.properties = { k: cl.k }; out.push(turf.simplify(f, { tolerance: 0.00001 })); });
+    log(cl.k + ': ' + feats.length + ' poligoni, ' + feats.map(f => Math.round(turf.area(f) / 1e4) / 100 + ' km2').join(', '));
+  }
+  const ext = turf.polygon([[ll(0, 0), ll(W, 0), ll(W, H), ll(0, H), ll(0, 0)]], { k: '__extent' });
+  out.push(ext);
+  const body = JSON.stringify(turf.truncate(turf.featureCollection(out), { precision: 6 }));
+  const r = await fetch('/__save?f=data/zone-ref.json', { method: 'POST', body });
+  log('salvato: ' + r.status + ' (' + Math.round(body.length / 1024) + ' KB)');
+})().catch(e => log('ERRORE ' + e + '\n' + e.stack));
+</script>

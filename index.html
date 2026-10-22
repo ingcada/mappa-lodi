@@ -60,7 +60,7 @@ Promise.all([fetch('data/zone.json').then(r => r.json()), fetch('data/zone-poly.
         <b class="pro">Pro</b>${lista(z.pro)}<b class="contro">Contro</b>${lista(z.contro)}
         <div><b>Giudizio flipping: ${z.score}.</b> ${z.flip}</div>
         <div style="margin-top:4px"><b>Microzone:</b> ${z.micro}</div>
-        <div class="fonte">Fonte: Immobiliare.it, mercato immobiliare Lodi, settembre 2026 (prezzi richiesti, non compravendite). Confini zona provvisori, da validare.</div></div>`, { maxWidth: 360 });
+        <div class="fonte">Fonte: Immobiliare.it, mercato immobiliare Lodi, settembre 2026 (prezzi richiesti, non compravendite). Confini zona: ricalcati dalla mappa zone di Immobiliare.it dove disponibile, altrove ricostruiti dalle vie di Immobiliare.it. Provvisori, da validare.</div></div>`, { maxWidth: 360 });
   });
 
   const leg = L.control({ position: 'bottomleft' });
