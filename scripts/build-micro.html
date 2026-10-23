@@ -1,0 +1,100 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Build microzone</title>
+<pre id="log" style="font:13px monospace"></pre>
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script>
+// Genera data/micro.json: ogni macrozona e' divisa in microzone per fascia di prezzo (classi da 100 €/mq
+// della scala di Immobiliare.it). Le microzone seguono gli isolati OSM.
+// - un isolato delimitato da vie di data/vie.json prende la media dei loro prezzi richiesti (dato diretto);
+// - gli altri prendono la media degli isolati vicini della stessa zona (stima, ripetuta fino a coprire la zona);
+// - cio' che resta senza dati prende il prezzo medio di zona (stima).
+// Uso: servire il progetto con scripts/serve.ps1 e aprire /scripts/build-micro.html
+// (richiede data/zone-poly.json, data/vie.json con tracciati e scripts/cache/strade.raw.json)
+const log = m => { document.getElementById('log').textContent += m + '\n'; };
+const k5 = (lo, la) => lo.toFixed(5) + ',' + la.toFixed(5);
+const classe = v => v < 1800 ? 0 : v >= 2700 ? 10 : Math.floor((v - 1800) / 100) + 1;
+const polys = f => !f ? [] : f.geometry.type === 'Polygon' ? [f] : f.geometry.coordinates.map(c => turf.polygon(c));
+const tagli = (p, q) => { try { return polys(turf.intersect(p, q)); } catch (e) { return []; } };
+const meno = (p, q) => { try { return polys(turf.difference(p, q)); } catch (e) { return [p]; } };
+const unisci = a => { let u = a[0]; for (let i = 1; i < a.length; i++) { try { u = turf.union(u, a[i]) || u; } catch (e) {} } return u; };
+
+(async () => {
+  const raw = await (await fetch('/scripts/cache/strade.raw.json')).json();
+  const vie = await (await fetch('/data/vie.json')).json();
+  const zonePoly = (await (await fetch('/data/zone-poly.json')).json()).features;
+  const zone = await (await fetch('/data/zone.json')).json();
+  const ask = Object.fromEntries(zone.map(z => [z.k, z.ask]));
+
+  const linee = turf.featureCollection(raw.elements.filter(e => e.geometry && e.geometry.length > 1)
+    .map(e => turf.lineString(e.geometry.map(p => [p.lon, p.lat]))));
+  const facce = turf.polygonize(linee).features;
+  log('isolati: ' + facce.length);
+
+  // vertici delle vie elencate -> indici di via
+  const vv = new Map();
+  vie.forEach((v, i) => (v.g || []).forEach(w => w.forEach(([la, lo]) => { const k = k5(lo, la); (vv.get(k) || vv.set(k, new Set()).get(k)).add(i); })));
+
+  const ring = f => [...new Set(f.geometry.coordinates[0].map(c => k5(c[0], c[1])))];
+  const rings = facce.map(ring);
+  const perVertice = new Map();
+  rings.forEach((r, i) => r.forEach(k => (perVertice.get(k) || perVertice.set(k, []).get(k)).push(i)));
+
+  // zona di ogni isolato (dal suo punto interno)
+  const punto = facce.map(f => turf.pointOnFeature(f));
+  const zonaDi = punto.map(p => { const z = zonePoly.find(f => turf.booleanPointInPolygon(p, f)); return z ? z.properties.k : null; });
+
+  // prezzo diretto: media delle vie elencate che costeggiano l'isolato (almeno 2 vertici in comune = un lato)
+  const prezzo = new Array(facce.length).fill(null), tipo = new Array(facce.length).fill(null), viaDi = facce.map(() => []);
+  rings.forEach((r, i) => {
+    const cnt = {}; r.forEach(k => (vv.get(k) || []).forEach(s => cnt[s] = (cnt[s] || 0) + 1));
+    const ss = Object.keys(cnt).filter(s => cnt[s] >= 2).map(Number);
+    if (ss.length) { prezzo[i] = ss.reduce((a, s) => a + vie[s].p, 0) / ss.length; tipo[i] = 'diretta'; viaDi[i] = ss; }
+  });
+  log('isolati con prezzo diretto: ' + tipo.filter(Boolean).length);
+
+  // stima dagli isolati vicini della stessa zona
+  for (let giro = 0; giro < 80; giro++) {
+    const nuovo = [];
+    facce.forEach((f, i) => {
+      if (prezzo[i] !== null) return;
+      const s = []; rings[i].forEach(k => perVertice.get(k).forEach(j => { if (j !== i && prezzo[j] !== null && zonaDi[j] === zonaDi[i]) s.push(prezzo[j]); }));
+      if (s.length) nuovo.push([i, s.reduce((a, b) => a + b, 0) / s.length]);
+    });
+    if (!nuovo.length) break;
+    nuovo.forEach(([i, p]) => { prezzo[i] = p; tipo[i] = 'stima'; });
+  }
+  log('isolati stimati dai vicini: ' + tipo.filter(t => t === 'stima').length);
+
+  // pezzi per zona, raggruppati per classe di prezzo
+  const out = [];
+  for (const Z of zonePoly) {
+    const k = Z.properties.k, bz = turf.bbox(Z), pezzi = [];
+    facce.forEach((f, i) => {
+      const b = turf.bbox(f);
+      if (b[0] > bz[2] || b[2] < bz[0] || b[1] > bz[3] || b[3] < bz[1]) return;
+      const dentro = tagli(f, Z);
+      dentro.forEach(p => pezzi.push({ f: p, i }));
+    });
+    const coperto = unisci(pezzi.map(p => p.f));
+    const avanzo = meno(Z, coperto).filter(p => turf.area(p) > 500);
+    const gruppi = {};
+    const metti = (p, prz, t, vv_) => { const c = classe(prz); (gruppi[c] = gruppi[c] || { f: [], a: 0, ap: 0, ad: 0, vie: new Set() }); const g = gruppi[c], a = turf.area(p); g.f.push(p); g.a += a; g.ap += a * prz; if (t === 'diretta') g.ad += a; (vv_ || []).forEach(s => g.vie.add(s)); };
+    pezzi.forEach(p => metti(p.f, prezzo[p.i] ?? ask[k], tipo[p.i] || 'zona', viaDi[p.i]));
+    avanzo.forEach(p => metti(p, ask[k], 'zona'));
+    for (const c of Object.keys(gruppi)) {
+      const g = gruppi[c]; let u = unisci(g.f);
+      try { u = turf.buffer(turf.buffer(u, 0.003, { units: 'kilometers' }), -0.003, { units: 'kilometers' }); } catch (e) {}
+      u = turf.truncate(turf.simplify(u, { tolerance: 0.00001, highQuality: false }), { precision: 5 });
+      u.properties = { z: k, c: +c, pm: Math.round(g.ap / g.a), dir: Math.round(100 * g.ad / g.a), km2: +(g.a / 1e6).toFixed(3), vie: [...g.vie] };
+      out.push(u);
+    }
+    log(`${k}: ${Object.keys(gruppi).length} classi, ${pezzi.length} pezzi`);
+  }
+  // elenco vie fuori dal file: nel popup servono nome e prezzo
+  out.forEach(u => u.properties.vie = u.properties.vie.map(s => [vie[s].n, vie[s].p]));
+  const body = JSON.stringify(turf.featureCollection(out));
+  const r = await fetch('/__save?f=data/micro.json', { method: 'POST', body });
+  log('salvato: ' + r.status + ' (' + Math.round(body.length / 1024) + ' KB), microzone: ' + out.length);
+})().catch(e => log('ERRORE ' + e + '\n' + e.stack));
+</script>
