@@ -75,9 +75,33 @@ Promise.all(['data/zone.json', 'data/zone-poly.json', 'data/micro.json', 'data/v
   const pannello = L.control({ position: 'topright' });
   pannello.onAdd = () => { const d = L.DomUtil.create('div', 'pannello'); L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d); pannello._d = d; return d; };
   pannello.addTo(map);
+  // --- Vie calde: prezzo richiesto sopra la mediana delle vie elencate della loro zona ---
+  const perZona = {};
+  vie.forEach(v => (perZona[v.z] = perZona[v.z] || []).push(v.p));
+  const mediana = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const med = {}; for (const z in perZona) med[z] = mediana(perZona[z]);
+  const calda = v => v.p > med[v.z], premio = v => (v.p / med[v.z] - 1) * 100;
+  const pct = n => (n >= 0 ? '+' : '') + n.toFixed(1).replace('.', ',') + '%';
+  let tutteCalde = false;
+  function disegnaVie(zona, calde, altre) {
+    livVie.clearLayers();
+    vie.filter(v => v.g && v.g.length && (!zona || v.z === zona) && (calda(v) ? calde : altre)).sort((a, b) => a.p - b.p).forEach(v => {
+      const h = calda(v);
+      if (h) L.polyline(v.g, { color: '#000', weight: 9, opacity: .85, interactive: false }).addTo(livVie);
+      L.polyline(v.g, { color: colore(v.p), weight: h ? 6 : 3, opacity: h ? 1 : .8 }).addTo(livVie)
+        .bindTooltip(`${v.n}: ${eur(v.p)} €/mq${h ? ' ▲' : ''}`, { sticky: true })
+        .bindPopup(`<div class="pop"><h4>${v.n}</h4>${v.z}
+          <div style="margin:6px 0"><b>${eur(v.p)} €/mq</b> richiesto${v.r ? ` · affitto ${dec(v.r)} €/mq/mese` : ''}<br>
+          Mediana delle vie della zona: ${eur(med[v.z])} €/mq (${pct(premio(v))})</div>
+          ${h ? '<b class="pro">Via calda: sopra la mediana di zona</b>' : 'Sotto o in linea con la mediana di zona'}
+          <div class="fonte">Fonte: Immobiliare.it, prezzi richiesti per via, settembre 2026. Tracciato: OpenStreetMap${v.m === 'punto' ? ' (via abbinata per vicinanza al punto)' : ''}.</div></div>`, { maxWidth: 300 });
+    });
+  }
   const intro = () => {
     pannello._d.innerHTML = '<h3>Zone di Lodi</h3><div>Clicca una zona per isolarla e vedere le microzone per fascia di prezzo.</div>' +
-      '<div class="fonte">Prezzi richiesti, Immobiliare.it, settembre 2026. Le microzone sono stime: vedi il dettaglio nel pannello della zona.</div>';
+      `<div style="margin:8px 0"><label><input type="checkbox" id="calde-tutte" ${tutteCalde ? 'checked' : ''}> Mostra le vie calde di tutta Lodi</label></div>` +
+      '<div class="fonte">Prezzi richiesti, Immobiliare.it, settembre 2026. Le microzone sono stime: vedi il dettaglio nel pannello della zona. Via calda = prezzo sopra la mediana delle vie elencate della sua zona.</div>';
+    document.getElementById('calde-tutte').onchange = e => { tutteCalde = e.target.checked; disegnaVie(null, tutteCalde, false); };
   };
 
   function seleziona(k) {
@@ -95,6 +119,8 @@ Promise.all(['data/zone.json', 'data/zone-poly.json', 'data/micro.json', 'data/v
           ${p.vie.length ? '<br>Vie di riferimento: ' + p.vie.map(v => `${v[0]} (${eur(v[1])})`).join(', ') : '<br>Nessuna via elencata: stima.'}</div>`, { maxWidth: 300 });
       return [f, l];
     });
+    const vz = vie.filter(v => v.z === k && v.g && v.g.length), calde = vz.filter(calda).sort((a, b) => premio(b) - premio(a));
+    disegnaVie(k, true, false);
     const dx = innerWidth > 700 ? 370 : 30; // il pannello copre la destra della mappa
     map.flyToBounds(layerZona[k].getBounds(), { paddingTopLeft: [30, 30], paddingBottomRight: [dx, 30], duration: .8 });
 
@@ -105,17 +131,26 @@ Promise.all(['data/zone.json', 'data/zone-poly.json', 'data/micro.json', 'data/v
       <b>Microzone (stima per fascia di prezzo)</b>
       <div id="elencoMicro">${ms.map((f, i) => f.properties.km2 < .005 ? '' : `<div class="micro" data-i="${i}"><span class="sw" style="background:${colore(f.properties.pm)}"></span>
         ${fasciaDi(f.properties)} €/mq<small>stima ${eur(f.properties.pm)} · ${dec(f.properties.km2)} km²</small></div>`).join('')}</div>
+      <div style="margin-top:8px"><b>Vie calde</b> · mediana di zona ${eur(med[k])} €/mq, ${calde.length} vie sopra</div>
+      <div style="margin:4px 0"><label><input type="checkbox" id="v-calde" checked> vie calde</label> &nbsp; <label><input type="checkbox" id="v-altre"> altre vie</label></div>
+      ${vz.length < 6 ? `<div class="fonte">Solo ${vz.length} vie elencate in questa zona: la mediana è poco affidabile.</div>` : ''}
+      <div id="elencoVie">${calde.map((v, i) => `<div class="micro" data-v="${i}"><span class="sw" style="background:${colore(v.p)}"></span>${v.n}<small>${eur(v.p)} · ${pct(premio(v))}</small></div>`).join('')}</div>
       <details><summary>Pro, contro e giudizio</summary>
         <b class="pro">Pro</b>${lista(z.pro)}<b class="contro">Contro</b>${lista(z.contro)}
         <div>${z.flip}</div><div style="margin-top:4px"><b>Microzone secondo il mercato:</b> ${z.micro}</div></details>
       <div class="fonte">Prezzi: Immobiliare.it, richiesti (non compravendite), settembre 2026. Microzone: stima dai prezzi delle vie elencate, estesa agli isolati vicini della stessa zona; confini zona provvisori.</div>`;
     document.getElementById('indietro').onclick = esci;
+    const aggiorna = () => disegnaVie(k, document.getElementById('v-calde').checked, document.getElementById('v-altre').checked);
+    document.getElementById('v-calde').onchange = aggiorna; document.getElementById('v-altre').onchange = aggiorna;
+    document.querySelectorAll('#elencoVie .micro').forEach(el => el.onclick = () => {
+      const v = calde[+el.dataset.v]; map.flyToBounds(L.polyline(v.g).getBounds(), { paddingTopLeft: [40, 40], paddingBottomRight: [dx, 40], maxZoom: 17, duration: .6 });
+    });
     document.querySelectorAll('#elencoMicro .micro').forEach(el => el.onclick = () => {
       const [f, l] = lm[+el.dataset.i]; map.flyToBounds(l.getBounds(), { padding: [40, 40], maxZoom: 17, duration: .6 }); l.openPopup(l.getBounds().getCenter());
     });
   }
   function esci() {
-    scelta = null; livMicro.clearLayers(); livVie.clearLayers();
+    scelta = null; livMicro.clearLayers(); disegnaVie(null, tutteCalde, false);
     for (const kk in layerZona) layerZona[kk].setStyle(stileZona(kk, 'norm'));
     intro(); map.flyToBounds(confine.getBounds(), { duration: .8 });
   }
@@ -140,6 +175,7 @@ Promise.all(['data/zone.json', 'data/zone-poly.json', 'data/micro.json', 'data/v
       '<i style="border-color:#c0392b;border-top-style:dashed"></i>Confine comunale<br>' +
       '<i style="border-color:#1f6fd1"></i>Adda<br>' +
       '<i style="border-color:#333;border-top-style:dotted"></i>Ferrovia<br>' +
+      '<span style="display:inline-block;width:22px;height:0;border-top:6px solid #c8a000;box-shadow:0 0 0 2px #000;vertical-align:middle;margin-right:6px"></span>Via calda<br>' +
       '<span style="color:#e67e22">&#9679;</span> Punti di riferimento<br>' +
       `<small>Confini zona provvisori. Geometrie: OpenStreetMap, ${BASE.data}</small>`;
     return d;
