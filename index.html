@@ -94,7 +94,7 @@ Promise.all(['data/zone.json', 'data/zone-poly.json', 'data/micro.json', 'data/v
           <div style="margin:6px 0"><b>${eur(v.p)} €/mq</b> richiesto${v.r ? ` · affitto ${dec(v.r)} €/mq/mese` : ''}<br>
           Mediana delle vie della zona: ${eur(med[v.z])} €/mq (${pct(premio(v))})</div>
           ${h ? '<b class="pro">Via calda: sopra la mediana di zona</b>' : 'Sotto o in linea con la mediana di zona'}
-          <div class="fonte">Fonte: Immobiliare.it, prezzi richiesti per via, settembre 2026. Tracciato: OpenStreetMap${v.m === 'punto' ? ' (via abbinata per vicinanza al punto)' : ''}.</div></div>`, { maxWidth: 300 });
+          <div class="fonte">Fonte: Immobiliare.it, prezzo richiesto per via (rif. settembre 2026), ${v.f === 'live' ? 'letto il 23/10/2026' : 'da elenco precedente (brief), non più nell\'ultimo elenco'}. Tracciato: OpenStreetMap${v.m === 'punto' ? ' (via abbinata per vicinanza al punto)' : ''}.</div></div>`, { maxWidth: 300 });
     });
   }
   const intro = () => {

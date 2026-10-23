@@ -17,7 +17,8 @@ const log = m => { document.getElementById('log').textContent += m + '\n'; };
 const k5 = (lo, la) => lo.toFixed(5) + ',' + la.toFixed(5);
 const FASCIA = 250, BASE0 = 1500;                                   // fasce [1500,1750), [1750,2000), ...
 const classe = v => Math.max(0, Math.floor((v - BASE0) / FASCIA));
-const polys = f => !f ? [] : f.geometry.type === 'Polygon' ? [f] : f.geometry.coordinates.map(c => turf.polygon(c));
+const valido = c => c.length && c.every(r => r.length >= 4);
+const polys = f => !f ? [] : f.geometry.type === 'Polygon' ? (valido(f.geometry.coordinates) ? [f] : []) : f.geometry.coordinates.filter(valido).map(c => turf.polygon(c));
 const tagli = (p, q) => { try { return polys(turf.intersect(p, q)); } catch (e) { return []; } };
 const meno = (p, q) => { try { return polys(turf.difference(p, q)); } catch (e) { return [p]; } };
 const unisci = a => { let u = a[0]; for (let i = 1; i < a.length; i++) { try { u = turf.union(u, a[i]) || u; } catch (e) {} } return u; };

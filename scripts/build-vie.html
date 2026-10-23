@@ -4,31 +4,60 @@
 <pre id="log" style="font:13px monospace"></pre>
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 <script>
-// Aggiunge a data/vie.json la geometria reale di ogni via (campo "g": elenco di tratti [[lat, lon], ...]) dai dati OSM.
-// Una via e' cercata per nome tra le strade del comune; se il nome non coincide si prende il tratto OSM piu' vicino
-// al punto della via (entro 80 m) e tutti i tratti con lo stesso nome OSM. Campo "m": come e' stata trovata.
+// Aggiorna data/vie.json:
+// 1) unisce le vie del brief con l'elenco letto da Immobiliare.it (data/vie-immobiliare.json): per le vie presenti
+//    in entrambi vale il prezzo dell'elenco piu' recente; le altre restano (campo "f": "live" o "brief");
+// 2) aggiunge la geometria reale OSM (campo "g": tratti [[lat, lon], ...]): per nome tra le strade del comune;
+//    se il nome non coincide (solo vie con punto noto) si prende il tratto OSM piu' vicino al punto, entro 80 m;
+// 3) assegna la zona dalla geometria: la zona (data/zone-poly.json) che contiene piu' vertici della via (campo "z").
 // Uso: servire il progetto con scripts/serve.ps1 e aprire /scripts/build-vie.html
-// (richiede scripts/cache/strade.raw.json, scaricato da Overpass: vedi README)
+// (richiede scripts/cache/strade.raw.json, scaricato da Overpass)
 const log = m => { document.getElementById('log').textContent += m + '\n'; };
 const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 (async () => {
   const raw = await (await fetch('/scripts/cache/strade.raw.json')).json();
-  const vie = await (await fetch('/data/vie.json')).json();
+  const vecchie = await (await fetch('/data/vie.json')).json();
+  const live = await (await fetch('/data/vie-immobiliare.json')).json();
+  const zone = (await (await fetch('/data/zone-poly.json')).json()).features.map(f => ({ k: f.properties.k, f, b: turf.bbox(f) }));
   const ways = raw.elements.filter(e => e.geometry && e.geometry.length > 1)
     .map(e => ({ nome: norm(e.tags.name || ''), c: e.geometry.map(p => [+p.lat.toFixed(5), +p.lon.toFixed(5)]) }));
-  let a = 0, b = 0, c = 0;
+
+  // 1) unione
+  const mappa = new Map(vecchie.map(v => [norm(v.n), v]));
+  let aggiornate = 0, nuove = 0;
+  live.vie.forEach(([n, p, r]) => {
+    const o = mappa.get(norm(n));
+    if (o) { o.p = p; if (r !== null) o.r = r; o.f = 'live'; aggiornate++; }
+    else { mappa.set(norm(n), { n, p, r, f: 'live' }); nuove++; }
+  });
+  vecchie.forEach(v => { if (!v.f) v.f = 'brief'; });
+  const vie = [...mappa.values()];
+  log(`vie: ${vie.length} (nel brief ${vecchie.length}; aggiornate dall'elenco ${aggiornate}; nuove ${nuove})`);
+
+  // 2) geometria e 3) zona
+  let a = 0, b = 0, c = 0, cambiate = 0;
+  const dentro = (la, lo) => { const pt = turf.point([lo, la]); const z = zone.find(z => lo >= z.b[0] && lo <= z.b[2] && la >= z.b[1] && la <= z.b[3] && turf.booleanPointInPolygon(pt, z.f)); return z ? z.k : null; };
   vie.forEach(v => {
     let sel = ways.filter(w => w.nome && w.nome === norm(v.n));
     v.m = 'nome';
-    if (!sel.length) {
+    if (!sel.length && v.lat !== undefined) {
       const p = turf.point([v.lon, v.lat]); let best = null, bd = 0.08;
       ways.forEach(w => { const d = turf.pointToLineDistance(p, turf.lineString(w.c.map(([la, lo]) => [lo, la])), { units: 'kilometers' }); if (d < bd) { bd = d; best = w; } });
       if (best) { sel = best.nome ? ways.filter(w => w.nome === best.nome) : [best]; v.m = 'punto'; }
     }
-    if (!sel.length) { v.m = 'non trovata'; c++; } else if (v.m === 'nome') a++; else b++;
+    if (!sel.length) { v.m = 'non trovata'; v.g = []; c++; log('NON TROVATA in OSM: ' + v.n); return; }
+    if (v.m === 'nome') a++; else b++;
     v.g = sel.map(w => w.c);
+    const pts = sel.flatMap(w => w.c);
+    if (v.lat === undefined) { v.lat = +(pts.reduce((s, p) => s + p[0], 0) / pts.length).toFixed(5); v.lon = +(pts.reduce((s, p) => s + p[1], 0) / pts.length).toFixed(5); }
+    const cnt = {}; pts.forEach(([la, lo]) => { const z = dentro(la, lo); if (z) cnt[z] = (cnt[z] || 0) + 1; });
+    const z = Object.keys(cnt).sort((x, y) => cnt[y] - cnt[x])[0];
+    if (z && z !== v.z) { if (v.z) cambiate++; v.z = z; }
+    if (!v.z) v.z = dentro(v.lat, v.lon) || 'fuori zone';
   });
-  log(`vie ${vie.length}: per nome ${a}, per punto ${b}, non trovate ${c}`);
+  log(`geometria: per nome ${a}, per punto ${b}, non trovate ${c}; zona cambiata rispetto al brief: ${cambiate}`);
+  const perZona = {}; vie.forEach(v => perZona[v.z] = (perZona[v.z] || 0) + 1);
+  log('vie per zona: ' + JSON.stringify(perZona));
   const body = JSON.stringify(vie);
   const r = await fetch('/__save?f=data/vie.json', { method: 'POST', body });
   log('salvato: ' + r.status + ' (' + Math.round(body.length / 1024) + ' KB)');
