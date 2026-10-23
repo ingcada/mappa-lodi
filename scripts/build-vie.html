@@ -1,0 +1,36 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Build vie</title>
+<pre id="log" style="font:13px monospace"></pre>
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script>
+// Aggiunge a data/vie.json la geometria reale di ogni via (campo "g": elenco di tratti [[lat, lon], ...]) dai dati OSM.
+// Una via e' cercata per nome tra le strade del comune; se il nome non coincide si prende il tratto OSM piu' vicino
+// al punto della via (entro 80 m) e tutti i tratti con lo stesso nome OSM. Campo "m": come e' stata trovata.
+// Uso: servire il progetto con scripts/serve.ps1 e aprire /scripts/build-vie.html
+// (richiede scripts/cache/strade.raw.json, scaricato da Overpass: vedi README)
+const log = m => { document.getElementById('log').textContent += m + '\n'; };
+const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+(async () => {
+  const raw = await (await fetch('/scripts/cache/strade.raw.json')).json();
+  const vie = await (await fetch('/data/vie.json')).json();
+  const ways = raw.elements.filter(e => e.geometry && e.geometry.length > 1)
+    .map(e => ({ nome: norm(e.tags.name || ''), c: e.geometry.map(p => [+p.lat.toFixed(5), +p.lon.toFixed(5)]) }));
+  let a = 0, b = 0, c = 0;
+  vie.forEach(v => {
+    let sel = ways.filter(w => w.nome && w.nome === norm(v.n));
+    v.m = 'nome';
+    if (!sel.length) {
+      const p = turf.point([v.lon, v.lat]); let best = null, bd = 0.08;
+      ways.forEach(w => { const d = turf.pointToLineDistance(p, turf.lineString(w.c.map(([la, lo]) => [lo, la])), { units: 'kilometers' }); if (d < bd) { bd = d; best = w; } });
+      if (best) { sel = best.nome ? ways.filter(w => w.nome === best.nome) : [best]; v.m = 'punto'; }
+    }
+    if (!sel.length) { v.m = 'non trovata'; c++; } else if (v.m === 'nome') a++; else b++;
+    v.g = sel.map(w => w.c);
+  });
+  log(`vie ${vie.length}: per nome ${a}, per punto ${b}, non trovate ${c}`);
+  const body = JSON.stringify(vie);
+  const r = await fetch('/__save?f=data/vie.json', { method: 'POST', body });
+  log('salvato: ' + r.status + ' (' + Math.round(body.length / 1024) + ' KB)');
+})().catch(e => log('ERRORE ' + e + '\n' + e.stack));
+</script>

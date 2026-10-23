@@ -41,7 +41,7 @@ const colore = v => SCALA[classe(v)];
 const eur = n => n.toLocaleString('it-IT');
 const lista = a => '<ul>' + a.map(x => `<li>${x}</li>`).join('') + '</ul>';
 
-Promise.all([fetch('data/zone.json').then(r => r.json()), fetch('data/zone-poly.json').then(r => r.json())]).then(([zone, poligoni]) => {
+Promise.all(['data/zone.json', 'data/zone-poly.json', 'data/vie.json'].map(u => fetch(u).then(r => r.json()))).then(([zone, poligoni, vie]) => {
   const prezzi = zone.map(z => z.ask), min = Math.min(...prezzi), max = Math.max(...prezzi);
   const gruppo = L.layerGroup().addTo(map);
   zone.forEach(z => {
@@ -61,12 +61,35 @@ Promise.all([fetch('data/zone.json').then(r => r.json()), fetch('data/zone-poly.
         <div class="fonte">Fonte: Immobiliare.it, mercato immobiliare Lodi, settembre 2026 (prezzi richiesti, non compravendite). Confini zona: ricalcati dalla mappa zone di Immobiliare.it dove disponibile, altrove ricostruiti dalle vie di Immobiliare.it. Provvisori, da validare.</div></div>`, { maxWidth: 360 });
   });
 
+  // --- Vie: colore per €/mq richiesto; contorno nero = sopra la mediana delle vie della sua zona ("via calda") ---
+  const perZona = {};
+  vie.forEach(v => (perZona[v.z] = perZona[v.z] || []).push(v.p));
+  const mediana = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const med = {}; for (const z in perZona) med[z] = mediana(perZona[z]);
+  const gVie = L.layerGroup().addTo(map);
+  let nCalde = 0;
+  vie.slice().sort((a, b) => a.p - b.p).forEach(v => {
+    if (!v.g || !v.g.length) return;
+    const calda = v.p > med[v.z], diff = (v.p / med[v.z] - 1) * 100;
+    if (calda) { nCalde++; L.polyline(v.g, { color: '#000', weight: 9, opacity: .85, interactive: false }).addTo(gVie); }
+    L.polyline(v.g, { color: colore(v.p), weight: calda ? 6 : 4, opacity: 1 }).addTo(gVie)
+      .bindTooltip(`${v.n}: ${eur(v.p)} €/mq${calda ? ' ▲' : ''}`, { sticky: true })
+      .bindPopup(`<div class="pop"><h3>${v.n}</h3>${v.z}
+        <div class="kpi"><b>${eur(v.p)} €/mq</b> richiesto${v.r ? ` · affitto ${String(v.r).replace('.', ',')} €/mq/mese` : ''}<br>
+        Mediana delle vie della zona: ${eur(Math.round(med[v.z]))} €/mq (${diff >= 0 ? '+' : ''}${diff.toFixed(1).replace('.', ',')}%)</div>
+        ${calda ? '<b class="pro">Via calda: sopra la mediana di zona</b>' : '<span>Sotto o in linea con la mediana di zona</span>'}
+        <div class="fonte">Fonte: Immobiliare.it, prezzi richiesti per via, settembre 2026. Tracciato: OpenStreetMap${v.m === 'punto' ? ' (via abbinata per vicinanza al punto)' : ''}.</div></div>`, { maxWidth: 320 });
+  });
+  L.control.layers(null, { 'Macrozone': gruppo, 'Vie (€/mq)': gVie }, { collapsed: false, position: 'topright' }).addTo(map);
+
   const leg = L.control({ position: 'bottomleft' });
   leg.onAdd = () => {
     const d = L.DomUtil.create('div', 'legenda');
     const sw = SCALA.map(c => `<span style="display:inline-block;width:16px;height:10px;background:${c};opacity:.75"></span>`).join('');
     d.innerHTML = '<b>Mappa valori Lodi</b><br><b>€/mq richiesto per zona</b><br>' + sw +
       '<br><small style="display:flex;justify-content:space-between;width:176px"><span>&lt; 1.800</span><span>&ge; 2.700</span></small>' +
+      `<span style="display:inline-block;width:22px;height:0;border-top:6px solid #c8a000;box-shadow:0 0 0 2px #000;vertical-align:middle;margin-right:6px"></span>Via calda (sopra la mediana di zona): ${nCalde} su ${vie.length}<br>` +
+      '<small>Colore delle vie = €/mq richiesto, stessa scala</small><br>' +
       '<i style="border-color:#c0392b;border-top-style:dashed"></i>Confine comunale<br>' +
       '<i style="border-color:#1f6fd1"></i>Adda<br>' +
       '<i style="border-color:#333;border-top-style:dotted"></i>Ferrovia<br>' +
