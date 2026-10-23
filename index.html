@@ -44,7 +44,7 @@ const SCALA = ['rgb(32,157,76)', 'rgb(67,161,63)', 'rgb(107,166,47)', 'rgb(148,1
                'rgb(221,152,12)', 'rgb(214,121,25)', 'rgb(207,92,36)', 'rgb(200,61,49)', 'rgb(194,33,60)'];
 const classe = v => v < 1800 ? 0 : v >= 2700 ? 10 : Math.floor((v - 1800) / 100) + 1;
 const colore = v => SCALA[classe(v)];
-const fascia = c => c === 0 ? '< 1.800' : c === 10 ? '≥ 2.700' : `${eur(1700 + c * 100)}–${eur(1800 + c * 100)}`;
+const fasciaDi = p => `${eur(p.lo)}–${eur(p.hi)}`;
 const eur = n => Math.round(n).toLocaleString('it-IT');
 const dec = n => String(n).replace('.', ',');
 const lista = a => '<ul>' + a.map(x => `<li>${x}</li>`).join('') + '</ul>';
@@ -87,19 +87,13 @@ Promise.all(['data/zone.json', 'data/zone-poly.json', 'data/micro.json', 'data/v
     const ms = micro.features.filter(f => f.properties.z === k).sort((a, b) => b.properties.pm - a.properties.pm);
     const lm = ms.map(f => {
       const p = f.properties;
-      const l = L.geoJSON(f, { style: { color: '#fff', weight: 1, fillColor: SCALA[p.c], fillOpacity: .8 } }).addTo(livMicro)
-        .bindTooltip(`Microzona ${fascia(p.c)} €/mq (stima ${eur(p.pm)})`, { sticky: true })
-        .bindPopup(`<div class="pop"><h4>Microzona ${fascia(p.c)} €/mq</h4>
+      const l = L.geoJSON(f, { style: { color: '#fff', weight: 2, fillColor: colore(p.pm), fillOpacity: .6 } }).addTo(livMicro)
+        .bindTooltip(`Microzona ${fasciaDi(p)} €/mq (stima ${eur(p.pm)})`, { sticky: true })
+        .bindPopup(`<div class="pop"><h4>Microzona ${fasciaDi(p)} €/mq</h4>
           Prezzo stimato medio: <b>${eur(p.pm)} €/mq</b><br>Superficie: ${dec(p.km2)} km²<br>
           Dato diretto da vie vicine: ${p.dir}% della superficie, il resto è stimato dagli isolati vicini o dalla media di zona.
           ${p.vie.length ? '<br>Vie di riferimento: ' + p.vie.map(v => `${v[0]} (${eur(v[1])})`).join(', ') : '<br>Nessuna via elencata: stima.'}</div>`, { maxWidth: 300 });
       return [f, l];
-    });
-    // vie elencate della zona, sottili, come riferimento
-    vie.filter(v => v.z === k && v.g).forEach(v => {
-      L.polyline(v.g, { color: '#000', weight: 5, opacity: .7, interactive: false }).addTo(livVie);
-      L.polyline(v.g, { color: colore(v.p), weight: 3, opacity: 1 }).addTo(livVie)
-        .bindTooltip(`${v.n}: ${eur(v.p)} €/mq`, { sticky: true });
     });
     const dx = innerWidth > 700 ? 370 : 30; // il pannello copre la destra della mappa
     map.flyToBounds(layerZona[k].getBounds(), { paddingTopLeft: [30, 30], paddingBottomRight: [dx, 30], duration: .8 });
@@ -109,8 +103,8 @@ Promise.all(['data/zone.json', 'data/zone-poly.json', 'data/micro.json', 'data/v
       <div class="kpi"><b>${eur(z.ask)} €/mq</b> richiesto · trend 12 mesi <b>${z.yoy > 0 ? '+' : ''}${dec(z.yoy)}%</b><br>
         ${z.n} annunci · affitto ${dec(z.rent)} €/mq/mese · giudizio flipping: <b>${z.score}</b></div>
       <b>Microzone (stima per fascia di prezzo)</b>
-      <div id="elencoMicro">${ms.map((f, i) => f.properties.km2 < .005 ? '' : `<div class="micro" data-i="${i}"><span class="sw" style="background:${SCALA[f.properties.c]}"></span>
-        ${fascia(f.properties.c)} €/mq<small>stima ${eur(f.properties.pm)} · ${dec(f.properties.km2)} km²</small></div>`).join('')}</div>
+      <div id="elencoMicro">${ms.map((f, i) => f.properties.km2 < .005 ? '' : `<div class="micro" data-i="${i}"><span class="sw" style="background:${colore(f.properties.pm)}"></span>
+        ${fasciaDi(f.properties)} €/mq<small>stima ${eur(f.properties.pm)} · ${dec(f.properties.km2)} km²</small></div>`).join('')}</div>
       <details><summary>Pro, contro e giudizio</summary>
         <b class="pro">Pro</b>${lista(z.pro)}<b class="contro">Contro</b>${lista(z.contro)}
         <div>${z.flip}</div><div style="margin-top:4px"><b>Microzone secondo il mercato:</b> ${z.micro}</div></details>

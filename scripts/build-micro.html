@@ -4,16 +4,19 @@
 <pre id="log" style="font:13px monospace"></pre>
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 <script>
-// Genera data/micro.json: ogni macrozona e' divisa in microzone per fascia di prezzo (classi da 100 €/mq
-// della scala di Immobiliare.it). Le microzone seguono gli isolati OSM.
+// Genera data/micro.json: ogni macrozona e' divisa in poche microzone per fascia di prezzo larga (250 €/mq).
+// Le microzone seguono gli isolati OSM.
 // - un isolato delimitato da vie di data/vie.json prende la media dei loro prezzi richiesti (dato diretto);
 // - gli altri prendono la media degli isolati vicini della stessa zona (stima, ripetuta fino a coprire la zona);
-// - cio' che resta senza dati prende il prezzo medio di zona (stima).
+// - cio' che resta senza dati prende il prezzo medio di zona (stima);
+// - i prezzi sono lisciati con i vicini; le microzone troppo piccole sono assorbite dalla confinante piu' simile
+//   (area minima: 4% della zona, tra 0,03 e 0,12 km2), cosi' restano pochi quartieri leggibili.
 // Uso: servire il progetto con scripts/serve.ps1 e aprire /scripts/build-micro.html
 // (richiede data/zone-poly.json, data/vie.json con tracciati e scripts/cache/strade.raw.json)
 const log = m => { document.getElementById('log').textContent += m + '\n'; };
 const k5 = (lo, la) => lo.toFixed(5) + ',' + la.toFixed(5);
-const classe = v => v < 1800 ? 0 : v >= 2700 ? 10 : Math.floor((v - 1800) / 100) + 1;
+const FASCIA = 250, BASE0 = 1500;                                   // fasce [1500,1750), [1750,2000), ...
+const classe = v => Math.max(0, Math.floor((v - BASE0) / FASCIA));
 const polys = f => !f ? [] : f.geometry.type === 'Polygon' ? [f] : f.geometry.coordinates.map(c => turf.polygon(c));
 const tagli = (p, q) => { try { return polys(turf.intersect(p, q)); } catch (e) { return []; } };
 const meno = (p, q) => { try { return polys(turf.difference(p, q)); } catch (e) { return [p]; } };
@@ -66,6 +69,16 @@ const unisci = a => { let u = a[0]; for (let i = 1; i < a.length; i++) { try { u
   }
   log('isolati stimati dai vicini: ' + tipo.filter(t => t === 'stima').length);
 
+  // lisciatura: meta' prezzo proprio, meta' media dei vicini della stessa zona (due passate)
+  for (let g = 0; g < 2; g++) {
+    const nuovo = prezzo.map((p, i) => {
+      if (p === null) return p;
+      const s = []; rings[i].forEach(k => perVertice.get(k).forEach(j => { if (j !== i && prezzo[j] !== null && zonaDi[j] === zonaDi[i]) s.push(prezzo[j]); }));
+      return s.length ? 0.5 * p + 0.5 * s.reduce((a, b) => a + b, 0) / s.length : p;
+    });
+    nuovo.forEach((p, i) => prezzo[i] = p);
+  }
+
   // pezzi per zona, raggruppati per classe di prezzo
   const out = [];
   for (const Z of zonePoly) {
@@ -78,18 +91,45 @@ const unisci = a => { let u = a[0]; for (let i = 1; i < a.length; i++) { try { u
     });
     const coperto = unisci(pezzi.map(p => p.f));
     const avanzo = meno(Z, coperto).filter(p => turf.area(p) > 500);
-    const gruppi = {};
-    const metti = (p, prz, t, vv_) => { const c = classe(prz); (gruppi[c] = gruppi[c] || { f: [], a: 0, ap: 0, ad: 0, vie: new Set() }); const g = gruppi[c], a = turf.area(p); g.f.push(p); g.a += a; g.ap += a * prz; if (t === 'diretta') g.ad += a; (vv_ || []).forEach(s => g.vie.add(s)); };
-    pezzi.forEach(p => metti(p.f, prezzo[p.i] ?? ask[k], tipo[p.i] || 'zona', viaDi[p.i]));
-    avanzo.forEach(p => metti(p, ask[k], 'zona'));
-    for (const c of Object.keys(gruppi)) {
-      const g = gruppi[c]; let u = unisci(g.f);
-      try { u = turf.buffer(turf.buffer(u, 0.003, { units: 'kilometers' }), -0.003, { units: 'kilometers' }); } catch (e) {}
-      u = turf.truncate(turf.simplify(u, { tolerance: 0.00001, highQuality: false }), { precision: 5 });
-      u.properties = { z: k, c: +c, pm: Math.round(g.ap / g.a), dir: Math.round(100 * g.ad / g.a), km2: +(g.a / 1e6).toFixed(3), vie: [...g.vie] };
-      out.push(u);
+    // tutti i pezzi della zona: poligono, prezzo, dato diretto o stima, vie di riferimento
+    const tutti = pezzi.map(p => ({ f: p.f, prz: prezzo[p.i] ?? ask[k], dir: tipo[p.i] === 'diretta', vie: viaDi[p.i] }))
+      .concat(avanzo.map(p => ({ f: p, prz: ask[k], dir: false, vie: [] })));
+    tutti.forEach(t => t.a = turf.area(t.f));
+    const chiudi = u => { try { return turf.buffer(turf.buffer(u, 0.003, { units: 'kilometers' }), -0.003, { units: 'kilometers' }); } catch (e) { return u; } };
+    // 1) parti contigue per fascia di prezzo
+    const gr = {}; tutti.forEach(t => (gr[classe(t.prz)] = gr[classe(t.prz)] || []).push(t.f));
+    let parti = [];
+    Object.keys(gr).forEach(c => polys(chiudi(unisci(gr[c]))).forEach(p => parti.push({ p, a: turf.area(p) })));
+    // 2) le parti troppo piccole passano alla confinante con cui dividono piu' bordo
+    const areaZona = turf.area(Z), minA = Math.min(Math.max(30000, 0.04 * areaZona), 120000);
+    for (let g = 0; g < 500 && parti.length > 1; g++) {
+      parti.sort((a, b) => a.a - b.a);
+      const s = parti[0]; if (s.a >= minA) break;
+      let sb; try { sb = turf.buffer(s.p, 0.012, { units: 'kilometers' }); } catch (e) { sb = s.p; }
+      let best = null, ba = -1;
+      parti.slice(1).forEach(q => { const x = tagli(sb, q.p).reduce((a, y) => a + turf.area(y), 0); if (x > ba) { ba = x; best = q; } });
+      if (ba <= 0) { // isola senza contatto: la parte piu' vicina
+        const c0 = turf.centroid(s.p); let bd = 1e9; parti.slice(1).forEach(q => { const d = turf.distance(c0, turf.centroid(q.p)); if (d < bd) { bd = d; best = q; } });
+      }
+      best.p = chiudi(unisci(polys(best.p).concat(polys(s.p)))); best.a = turf.area(best.p);
+      parti.shift();
     }
-    log(`${k}: ${Object.keys(gruppi).length} classi, ${pezzi.length} pezzi`);
+    // 3) statistiche per parte (dai pezzi contenuti), nuova fascia dal prezzo medio, unione delle parti della stessa fascia
+    const pt = parti.map(q => ({ p: q.p, a: 0, ap: 0, ad: 0, vie: new Set() }));
+    tutti.forEach(t => {
+      const c = turf.pointOnFeature(t.f); let q = pt.find(x => polys(x.p).some(y => turf.booleanPointInPolygon(c, y)));
+      if (!q) { let bd = 1e9; pt.forEach(x => { const d = turf.distance(c, turf.centroid(x.p)); if (d < bd) { bd = d; q = x; } }); }
+      q.a += t.a; q.ap += t.a * t.prz; if (t.dir) q.ad += t.a; t.vie.forEach(s => q.vie.add(s));
+    });
+    const fin = {};
+    pt.filter(q => q.a > 0).forEach(q => { const c = classe(q.ap / q.a); (fin[c] = fin[c] || []).push(q); });
+    Object.keys(fin).forEach(c => {
+      const qs = fin[c], a = qs.reduce((s, q) => s + q.a, 0), ap = qs.reduce((s, q) => s + q.ap, 0), ad = qs.reduce((s, q) => s + q.ad, 0);
+      let u = turf.truncate(turf.simplify(chiudi(unisci(qs.flatMap(q => polys(q.p)))), { tolerance: 0.00001, highQuality: false }), { precision: 5 });
+      u.properties = { z: k, c: +c, lo: BASE0 + FASCIA * c, hi: BASE0 + FASCIA * (+c + 1), pm: Math.round(ap / a), dir: Math.round(100 * ad / a), km2: +(a / 1e6).toFixed(3), vie: [...new Set(qs.flatMap(q => [...q.vie]))] };
+      out.push(u);
+    });
+    log(`${k}: ${Object.keys(fin).length} microzone (min ${Math.round(minA / 1000) / 1000} km2), ${tutti.length} pezzi`);
   }
   // elenco vie fuori dal file: nel popup servono nome e prezzo
   out.forEach(u => u.properties.vie = u.properties.vie.map(s => [vie[s].n, vie[s].p]));
